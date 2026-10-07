@@ -23,12 +23,16 @@ export default function Feedback() {
     }
     setStatus("sending");
     setError("");
-    try {
-      const res = await base44.functions.invoke("sendFeedback", {
-        name: name.trim(),
-        email: email.trim(),
-        feedback: feedback.trim(),
-      });
+  try {
+  const res = await fetch("https://api.web3forms.com/submit", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      access_key: "ac8fd8f6-c54e-4eb9-b1c9-aee92dcd2124",
+      name: name.trim(),
+      email: email.trim(),
+      message: feedback.trim(),
+  });
       if (res.data?.ok) {
         setStatus("sent");
       } else {
