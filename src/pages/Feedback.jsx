@@ -25,26 +25,23 @@ export default function Feedback() {
     setError("");
 
     try {
+      const formData = new FormData();
+      formData.append("access_key", "ac8fd8f6-c54e-4eb9-b1c9-aee92dcd2124");
+      formData.append("name", name.trim());
+      formData.append("email", email.trim());
+      formData.append("message", feedback.trim());
+
       const res = await fetch("https://api.web3forms.com/submit", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify({
-          access_key: "ac8fd8f6-c54e-4eb9-b1c9-aee92dcd2124",
-          name: name.trim(),
-          email: email.trim(),
-          message: feedback.trim(),
-        }),
+        body: formData,
       });
 
       const data = await res.json();
 
-      if (data.success) {
+      if (res.ok && data.success) {
         setStatus("sent");
       } else {
-        setError(data.message || "Couldn't send.");
+        setError(data.message || "Couldn't send feedback.");
         setStatus("error");
       }
     } catch (err) {
