@@ -3,10 +3,8 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Send, Check, AlertCircle, ArrowLeft } from "lucide-react";
 import FloatingShapes from "@/components/FloatingShapes";
-import { useT } from "@/lib/i18n";
 
 export default function Feedback() {
-  const t = useT();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [feedback, setFeedback] = useState("");
@@ -16,7 +14,7 @@ export default function Feedback() {
   const submit = async (e) => {
     e.preventDefault();
     if (!feedback.trim()) {
-      setError(t("feedback.required"));
+      setError("Please write your feedback before sending.");
       setStatus("error");
       return;
     }
@@ -58,7 +56,7 @@ export default function Feedback() {
           to="/about"
           className="inline-flex items-center gap-1.5 text-sm text-charcoal/60 hover:text-charcoal mb-8"
         >
-          <ArrowLeft className="w-4 h-4" /> {t("feedback.backAbout")}
+          <ArrowLeft className="w-4 h-4" /> Back to About
         </Link>
 
         {status === "sent" ? (
@@ -71,20 +69,20 @@ export default function Feedback() {
               <Check className="w-8 h-8 text-sage-deep" />
             </div>
             <span className="font-mono text-xs uppercase tracking-widest text-charcoal/50 block mb-2">
-              {t("feedback.sentTag")}
+              Feedback Sent
             </span>
             <h1 className="font-display text-4xl sm:text-5xl text-charcoal mt-2 mb-4">
-              {t("feedback.thankYou")}
+              Thank You!
             </h1>
             <p className="text-charcoal/60 mt-3 max-w-md mx-auto">
-              {t("feedback.thanksDesc")}
+              Your message has been delivered directly to our inbox.
             </p>
             <div className="mt-8 flex flex-wrap gap-3 justify-center">
               <Link
                 to="/train"
                 className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-charcoal text-cream font-medium hover:bg-charcoal/90 transition-all"
               >
-                {t("feedback.back")}
+                Back to Training
               </Link>
               <button
                 onClick={() => {
@@ -95,57 +93,57 @@ export default function Feedback() {
                 }}
                 className="px-6 py-3 rounded-xl border border-charcoal/15 text-charcoal font-medium hover:bg-charcoal/5 transition-all"
               >
-                {t("feedback.another")}
+                Send Another
               </button>
             </div>
           </motion.div>
         ) : (
           <div>
             <span className="font-mono text-xs uppercase tracking-widest text-charcoal/50 block mb-2">
-              {t("feedback.tag")}
+              Share Your Thoughts
             </span>
             <h1 className="font-display text-4xl sm:text-5xl text-charcoal mb-4">
-              {t("feedback.title")}
+              Help us make RhetoGym better.
             </h1>
             <p className="text-charcoal/70 text-lg mb-8">
-              {t("feedback.desc")}
+              Found a bug or have an idea to make RhetoGym better? Drop a note below.
             </p>
 
             <form onSubmit={submit} className="space-y-6">
               <div>
                 <label className="block text-sm text-charcoal/70 mb-1.5">
-                  {t("feedback.nameLabel")}
+                  Your Name (optional)
                 </label>
                 <input
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder={t("feedback.namePlaceholder")}
+                  placeholder="e.g. Alex"
                   className="w-full px-4 py-3 rounded-xl border border-charcoal/15 bg-white/60 focus:outline-none focus:border-charcoal/40 transition-all"
                 />
               </div>
 
               <div>
                 <label className="block text-sm text-charcoal/70 mb-1.5">
-                  {t("feedback.emailLabel")}
+                  Email (optional, for follow-up)
                 </label>
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder={t("feedback.emailPlaceholder")}
+                  placeholder="alex@example.com"
                   className="w-full px-4 py-3 rounded-xl border border-charcoal/15 bg-white/60 focus:outline-none focus:border-charcoal/40 transition-all"
                 />
               </div>
 
               <div>
                 <label className="block text-sm text-charcoal/70 mb-1.5">
-                  {t("feedback.msgLabel")}
+                  Your Feedback
                 </label>
                 <textarea
                   value={feedback}
                   onChange={(e) => setFeedback(e.target.value)}
-                  placeholder={t("feedback.msgPlaceholder")}
+                  placeholder="What's working? What could be better?"
                   rows={5}
                   className="w-full px-4 py-3 rounded-xl border border-charcoal/15 bg-white/60 focus:outline-none focus:border-charcoal/40 transition-all"
                 />
@@ -164,10 +162,10 @@ export default function Feedback() {
                 className="group inline-flex items-center gap-2 px-8 py-3.5 rounded-xl bg-charcoal text-cream font-medium hover:bg-charcoal/90 transition-all disabled:opacity-50"
               >
                 {status === "sending" ? (
-                  t("feedback.sending")
+                  "Sending..."
                 ) : (
                   <>
-                    <Send className="w-4 h-4" /> {t("feedback.submit")}
+                    <Send className="w-4 h-4" /> Send Feedback
                   </>
                 )}
               </button>
