@@ -5,6 +5,7 @@ import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import { LanguageProvider } from '@/lib/i18n';
+import { Analytics } from '@vercel/analytics/react';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import ScrollToTop from './components/ScrollToTop';
 import Layout from '@/components/Layout';
@@ -77,6 +78,7 @@ function App() {
           <Toaster />
         </QueryClientProvider>
       </AuthProvider>
+      <Analytics/>
     </LanguageProvider>
   )
 }
