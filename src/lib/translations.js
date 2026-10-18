@@ -31,7 +31,7 @@ export const translations = {
     "tips.delivery.title": "Core Delivery",
     "tips.delivery.intro": "Good speaking is not only about what you say. Pace, pauses, and clarity matter too.",
     "tips.delivery.cards": [
-      { "title": "Find Your Pace", "rule": "Aim for roughly 130 to 150 words per minute.", "practice": "Check your WPM after a round. If you are consistently above 160, try slowing down slightly in your next round." },
+      { "title": "Find Your Pace", "rule": "Aim for roughly 120 to 165 words per minute.", "practice": "Check your WPM after a round. If you are consistently above 165, try slowing down slightly in your next round." },
       { "title": "Let Silence Work", "rule": "When you need a moment to think, pause instead of filling the space with \"um,\" \"uh,\" or \"like.\"", "practice": "Try a deliberate one-second pause the next time you lose your train of thought. Then continue.", "note": "A short pause can give you time to think while keeping your delivery clear." },
       { "title": "Make Your Words Clear", "rule": "Slow down slightly on important words and finish your consonants clearly.", "practice": "Before a round, say a few sentences while paying attention to the sounds at the ends of words. Then focus on clarity during your round." }
     ],
