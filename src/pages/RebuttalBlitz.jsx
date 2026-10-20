@@ -300,23 +300,23 @@ export default function RebuttalBlitz() {
     );
   }
 
- return (
+return (
     <div className="relative mx-auto max-w-3xl px-5 sm:px-8 py-10">
-      <ReviewPanel 
-        key={round?.id || prompt?.id || "review"} 
-        record={round || { category: prompt?.cats?.[0], difficulty: prompt?.level, promptId: prompt?.id, challengeType: prompt?.structure, targetDuration: TOTAL }} 
-        audioUrl={rec.audioUrl} 
-        transcript={rec.transcript} 
-        metrics={metrics} 
-        accent={ACCENT} 
-        motion={p.motion} 
-        position={p.position} 
-        drillName="Rebuttal Blitz" 
-        onRetry={retry} 
-      />
-
-      {showReceipt && round && (
+      {showReceipt && round ? (
         <PracticeReceipt round={round} onClose={() => setShowReceipt(false)} />
+      ) : (
+        <ReviewPanel 
+          key={round?.id || prompt?.id || "review"} 
+          record={round || { category: prompt?.cats?.[0], difficulty: prompt?.level, promptId: prompt?.id, challengeType: prompt?.structure, targetDuration: TOTAL }} 
+          audioUrl={rec.audioUrl} 
+          transcript={rec.transcript} 
+          metrics={metrics} 
+          accent={ACCENT} 
+          motion={p.motion} 
+          position={p.position} 
+          drillName="Rebuttal Blitz" 
+          onRetry={retry} 
+        />
       )}
     </div>
   );
