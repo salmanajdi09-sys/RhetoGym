@@ -103,32 +103,45 @@ export default function PracticeReceipt({ round, onClose }) {
     ? `${m.fillerCount} (${(m.fillerList || []).slice(0, 2).map((f) => f.word).join(", ")})`
     : hasTranscript ? t("receipt.none") : "—";
 
-  const capture = async () => {
-    if (!cardRef.current) return null;
-    return html2canvas(cardRef.current, { backgroundColor: C.cream, scale: 2, useCORS: true, logging: false });
-  };
-
   const handleSave = async () => {
-    setBusy(true); setError("");
+    if (!cardRef.current) return;
+    setBusy(true); 
+    setError("");
+    
     try {
-      const canvas = await capture();
+      // Reduced scale for mobile safety to prevent memory crashes
+      const isMobile = window.innerWidth < 768;
+      const canvas = await html2canvas(cardRef.current, { 
+        backgroundColor: C.cream, 
+        scale: isMobile ? 1.5 : 2, 
+        useCORS: true, 
+        logging: false 
+      });
+      
       const url = canvas.toDataURL("image/png");
       const a = document.createElement("a");
-      a.href = url; a.download = "rhetogym-round.png"; a.click();
-    } catch {
-      setError(t("receipt.saveError"));
-    } finally { setBusy(false); }
+      a.href = url; 
+      a.download = "rhetogym-round.png"; 
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch (err) {
+      console.error("Capture failed:", err);
+      setError(t("receipt.saveError") || "Could not save image on this device.");
+    } finally { 
+      setBusy(false); 
+    }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto">
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="absolute inset-0 bg-charcoal/40 backdrop-blur-sm" onClick={onClose} />
 
       <motion.div
         initial={{ opacity: 0, scale: 0.92, y: 16 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ type: "spring", stiffness: 240, damping: 24 }}
-        className="relative z-10 w-full max-w-md"
+        className="relative z-10 w-full max-w-md my-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <button onClick={onClose} aria-label={t("receipt.close")} className="absolute -top-3 -right-3 z-20 w-10 h-10 rounded-full bg-card border border-border flex items-center justify-center text-charcoal/60 hover:text-charcoal hover:scale-105 transition-transform shadow-md">
@@ -178,7 +191,7 @@ export default function PracticeReceipt({ round, onClose }) {
               </div>
             )}
 
-            {/* metrics grid — responsive auto-fit */}
+            {/* metrics grid */}
             <div style={{ marginTop: 18, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 8 }}>
               <Metric label={t("receipt.mode")} value={round?.drillName || "—"} delay={0.15} />
               <Metric label={t("receipt.duration")} value={formatTime(round?.durationSec || 0)} delay={0.2} />
@@ -188,7 +201,7 @@ export default function PracticeReceipt({ round, onClose }) {
               <Metric label={t("receipt.date")} value={dateStr} delay={0.4} />
             </div>
 
-            {/* reflection (only if entered) */}
+            {/* reflection */}
             {reflectionText && (
               <div style={{ marginTop: 14, borderRadius: 16, padding: "12px 14px", background: "hsl(44, 78%, 74%, 0.22)", border: `1px solid hsl(42, 76%, 60%, 0.25)` }}>
                 <div style={{ fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", fontFamily: "ui-monospace, monospace", color: "hsl(240, 8%, 45%)" }}>{t("receipt.reflection")}</div>
@@ -204,10 +217,14 @@ export default function PracticeReceipt({ round, onClose }) {
           </div>
         </div>
 
-        {/* actions (not captured) */}
-        <div className="flex items-center justify-center mt-5">
-          <button onClick={handleSave} disabled={busy} className="inline-flex items-center gap-2 px-8 py-3.5 rounded-full bg-charcoal text-cream font-semibold hover:scale-[1.03] transition-transform disabled:opacity-50 shadow-lg shadow-charcoal/10">
+        {/* actions */}
+        <div className="flex items-center justify-center gap-3 mt-5">
+          <button onClick={handleSave} disabled={busy} className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full bg-charcoal text-cream font-semibold hover:scale-[1.03] transition-transform disabled:opacity-50 shadow-lg shadow-charcoal/10">
             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />} {t("receipt.save")}
+          </button>
+          
+          <button onClick={onClose} className="px-6 py-3.5 rounded-full bg-card border border-border text-charcoal font-semibold hover:bg-muted transition-colors">
+            {t("common.close") || "Continue to Review"}
           </button>
         </div>
         {error && <p className="text-center text-sm text-destructive mt-3">{error}</p>}
