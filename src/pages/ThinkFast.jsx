@@ -42,6 +42,7 @@ export default function ThinkFast() {
     setPrompt(randomPrompt(thinkfastPrompts, lang, cat, lvl));
     setPhase("prompt");
   };
+
   const shuffle = () => setPrompt(randomPrompt(thinkfastPrompts, lang, category, level));
 
   useEffect(() => {
@@ -84,7 +85,6 @@ export default function ThinkFast() {
 
   useEffect(() => {
     if (rec.status === "stopped" && phase === "record") {
-      // 200ms stagger gives mobile hardware threads time to safely complete audio buffer flush
       const timer = setTimeout(() => {
         const dur = Math.min(SPEAK, Math.max(elapsed, 1));
         const mt = computeMetrics(rec.transcript, dur);
@@ -99,10 +99,10 @@ export default function ThinkFast() {
           position: "SPEAK",
           drillName: "Think Fast",
           durationSec: dur,
-          category: prompt?.cats?.[0] || "general", 
-          difficulty: prompt?.level || "any", 
-          promptId: prompt?.id || "prompt", 
-          challengeType: prompt?.structure || prompt?.type || "thinkfast", 
+          category: prompt?.cats?.[0] || "general",
+          difficulty: prompt?.level || "any",
+          promptId: prompt?.id || "prompt",
+          challengeType: prompt?.structure || prompt?.type || "thinkfast",
           targetDuration: SPEAK,
         }));
         setShowReceipt(true);
@@ -245,4 +245,60 @@ export default function ThinkFast() {
             </div>
             <div className="mt-3 inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-charcoal/5">
               <span className={`w-2.5 h-2.5 rounded-full ${bandColor} ${rec.status === "recording" ? "animate-pulse-soft" : ""}`} />
-              <span className="font-mono text-xs uppercase tracking-widest text-charcoal/60">{liveW
+              <span className="font-mono text-xs uppercase tracking-widest text-charcoal/60">{liveWpm > 0 ? `~${liveWpm} WPM` : "…"}</span>
+            </div>
+            {prompt?.type === "reverse" && (
+              <div className={`mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-full ${half ? "bg-coral/20 border border-coral-deep/40" : "bg-charcoal/5"}`}>
+                <span className={`w-2 h-2 rounded-full ${half ? "bg-coral-deep animate-pulse-soft" : "bg-charcoal/40"}`} />
+                <span className="font-mono text-xs uppercase tracking-widest text-charcoal/70">{half ? t("thinkfast.switchNow") : t("thinkfast.sideOne")}</span>
+              </div>
+            )}
+          </div>
+          <div className="h-2.5 rounded-full bg-charcoal/8 overflow-hidden">
+            <motion.div className="h-full rounded-full" style={{ width: `${pct * 100}%`, background: `hsl(var(--${ACCENT}-deep))` }} />
+          </div>
+          <div className="mt-6 flex flex-col items-center gap-4">
+            <div className="inline-flex items-center gap-3 px-6 py-3 rounded-full bg-coral/20 border border-coral-deep/30">
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-coral-deep opacity-60" />
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-coral-deep" />
+              </span>
+              <span className="font-mono text-sm font-bold tracking-widest text-coral-deep">{t("record.recording")}</span>
+            </div>
+            <div className="flex flex-col sm:flex-row items-center gap-3">
+              <button onClick={finish} className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-charcoal text-cream font-medium hover:scale-105 transition-transform">
+                <Square className="w-4 h-4" /> {t("record.endReview")}
+              </button>
+              <button onClick={retry} className="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-card border border-border text-charcoal/70 font-medium hover:text-charcoal">
+                <RotateCcw className="w-4 h-4" /> {t("record.restart")}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative mx-auto max-w-3xl px-5 sm:px-8 py-10">
+      {showReceipt && round && (
+        <PracticeReceipt round={round} onClose={() => setShowReceipt(false)} />
+      )}
+      {!showReceipt && (
+        <ReviewPanel 
+          key={round?.id || prompt?.id} 
+          record={round || { category: prompt?.cats?.[0], difficulty: prompt?.level, promptId: prompt?.id, challengeType: prompt?.type, targetDuration: SPEAK }} 
+          audioUrl={rec.audioUrl} 
+          transcript={rec.transcript} 
+          metrics={metrics} 
+          accent={ACCENT} 
+          motion={txt} 
+          position="SPEAK" 
+          drillName="Think Fast" 
+          onRetry={retry} 
+          showSelfCheck={false} 
+        />
+      )}
+    </div>
+  );
+}
