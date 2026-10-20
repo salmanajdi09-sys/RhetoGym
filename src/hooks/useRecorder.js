@@ -4,9 +4,9 @@ import { useRef, useState, useCallback, useEffect } from "react";
 function getSupportedMimeType() {
   if (typeof MediaRecorder === "undefined") return "";
   const types = [
+    "audio/mp4",
     "audio/webm;codecs=opus",
     "audio/webm",
-    "audio/mp4",
     "audio/aac",
     "audio/ogg",
   ];
@@ -75,14 +75,17 @@ export function useRecorder(lang = "en") {
         } catch (e) {
           console.error("Failed to process recorded audio Blob:", e);
         } finally {
+          // Release media tracks only after final data slice is processed
           if (streamRef.current) {
             streamRef.current.getTracks().forEach((t) => t.stop());
+            streamRef.current = null;
           }
           setStatus("stopped");
         }
       };
 
-      mr.start(250); // Request slices every 250ms to ensure chunks arrive smoothly on mobile
+      // Request data in chunks without straining mobile threads
+      mr.start(1000);
       mediaRecorderRef.current = mr;
       setStatus("recording");
 
@@ -109,19 +112,9 @@ export function useRecorder(lang = "en") {
             console.warn("Speech recognition notice:", err);
           };
 
+          // Detach automated restarts to eliminate mic indicator flickering
           rec.onend = () => {
-            // Only attempt restart if we are actively recording and NOT in the process of stopping
-            if (
-              !isStoppingRef.current &&
-              mediaRecorderRef.current &&
-              mediaRecorderRef.current.state === "recording"
-            ) {
-              try {
-                rec.start();
-              } catch (e) {
-                // Prevent aggressive restart loops on mobile
-              }
-            }
+            // No auto-restart to preserve native mic lock stability
           };
 
           rec.start();
@@ -139,29 +132,32 @@ export function useRecorder(lang = "en") {
   const stop = useCallback(() => {
     isStoppingRef.current = true;
 
-    // Safely stop speech recognition first
+    // Clean up Speech Recognition
     if (recognitionRef.current) {
       try {
-        recognitionRef.current.onend = null; // Detach listener so it stops cleanly
+        recognitionRef.current.onend = null;
         recognitionRef.current.stop();
       } catch (e) {}
       recognitionRef.current = null;
     }
 
-    // Safely stop MediaRecorder
+    // Stop MediaRecorder (tracks will stop inside mr.onstop)
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
       try {
         mediaRecorderRef.current.stop();
       } catch (e) {
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach((t) => t.stop());
+          streamRef.current = null;
+        }
         setStatus("stopped");
       }
     } else {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+      }
       setStatus("stopped");
-    }
-
-    // Immediately stop microphone tracks to eliminate notification twitching
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
     }
   }, []);
 
