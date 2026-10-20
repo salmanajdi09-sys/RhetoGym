@@ -28,7 +28,7 @@ const Waveform = forwardRef(function Waveform(
     getTime: () => (audioRef.current ? audioRef.current.currentTime : 0),
     play: () => {
       const a = audioRef.current;
-      if (a) a.play();
+      if (a) a.play().catch(() => {});
     },
     pause: () => {
       const a = audioRef.current;
@@ -36,41 +36,57 @@ const Waveform = forwardRef(function Waveform(
     },
   }));
 
-  // decode + build bars
+  // decode + build bars safely with mobile fallback
   useEffect(() => {
     if (!audioUrl) return;
     let cancelled = false;
     setReady(false);
     setBars([]);
+
     (async () => {
       try {
         const res = await fetch(audioUrl);
         const ab = await res.arrayBuffer();
-        const AC = window.AudioContext || window.webkitAudioContext;
-        if (!AC) return;
-        const ctx = new AC();
-        const buf = await ctx.decodeAudioData(ab.slice(0));
-        ctx.close();
         if (cancelled) return;
-        const data = buf.getChannelData(0);
-        const N = 110;
-        const step = Math.max(1, Math.floor(data.length / N));
-        const out = [];
-        for (let i = 0; i < N; i++) {
-          let max = 0;
-          for (let j = 0; j < step; j++) {
-            const v = Math.abs(data[i * step + j] || 0);
-            if (v > max) max = v;
+
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (AC) {
+          const ctx = new AC();
+          try {
+            const buf = await ctx.decodeAudioData(ab.slice(0));
+            if (ctx.state !== "closed") await ctx.close();
+            if (cancelled) return;
+
+            const data = buf.getChannelData(0);
+            const N = 110;
+            const step = Math.max(1, Math.floor(data.length / N));
+            const out = [];
+            for (let i = 0; i < N; i++) {
+              let max = 0;
+              for (let j = 0; j < step; j++) {
+                const v = Math.abs(data[i * step + j] || 0);
+                if (v > max) max = v;
+              }
+              out.push(max);
+            }
+            const peak = Math.max(...out, 0.01);
+            setBars(out.map((v) => Math.max(0.04, v / peak)));
+          } catch (decodeErr) {
+            console.warn("AudioContext decode failed on mobile, using fallback bars:", decodeErr);
+            // Fallback placeholder bars so mobile doesn't break
+            setBars(Array(110).fill(0.3));
           }
-          out.push(max);
+        } else {
+          setBars(Array(110).fill(0.3));
         }
-        const peak = Math.max(...out, 0.01);
-        setBars(out.map((v) => Math.max(0.04, v / peak)));
         setReady(true);
-      } catch {
-        setReady(false);
+      } catch (err) {
+        console.warn("Waveform load error:", err);
+        setBars(Array(110).fill(0.3));
+        setReady(true);
       }
     })();
+
     return () => {
       cancelled = true;
     };
@@ -86,6 +102,7 @@ const Waveform = forwardRef(function Waveform(
     canvas.width = rect.width * dpr;
     canvas.height = rect.height * dpr;
     const ctx = canvas.getContext("2d");
+    if (!ctx) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     const W = rect.width,
       H = rect.height;
@@ -133,8 +150,7 @@ const Waveform = forwardRef(function Waveform(
     const a = audioRef.current;
     if (!a) return;
     if (a.paused) {
-      a.play();
-      setPlaying(true);
+      a.play().then(() => setPlaying(true)).catch(() => {});
     } else {
       a.pause();
       setPlaying(false);
@@ -145,8 +161,7 @@ const Waveform = forwardRef(function Waveform(
     const a = audioRef.current;
     if (!a) return;
     a.currentTime = 0;
-    a.play();
-    setPlaying(true);
+    a.play().then(() => setPlaying(true)).catch(() => {});
   };
 
   const handleCanvasClick = (e) => {
