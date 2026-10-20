@@ -234,26 +234,24 @@ export default function Soapbox() {
     );
   }
 
- return (
+return (
     <div className="relative mx-auto max-w-3xl px-5 sm:px-8 py-10">
-      {/* 1. Review Panel renders underneath */}
-      <ReviewPanel 
-        key={round?.id || prompt?.id || "review"} 
-        record={round || { category: prompt?.cats?.[0], difficulty: prompt?.level, promptId: prompt?.id, challengeType: prompt?.structure, targetDuration: TOTAL }} 
-        audioUrl={rec.audioUrl} 
-        transcript={rec.transcript} 
-        metrics={metrics} 
-        accent={ACCENT} 
-        motion={txt} 
-        position="DELIVER" 
-        drillName="Soapbox" 
-        onRetry={retry} 
-        extra={<AudienceViz energy={metrics?.hasTranscript ? 0.7 : 0.4} restless={0} />}
-      />
-
-      {/* 2. Practice Receipt renders ON TOP as a modal overlay */}
-      {showReceipt && round && (
+      {showReceipt && round ? (
         <PracticeReceipt round={round} onClose={() => setShowReceipt(false)} />
+      ) : (
+        <ReviewPanel 
+          key={round?.id || prompt?.id || "review"} 
+          record={round || { category: prompt?.cats?.[0], difficulty: prompt?.level, promptId: prompt?.id, challengeType: prompt?.structure, targetDuration: TOTAL }} 
+          audioUrl={rec.audioUrl} 
+          transcript={rec.transcript} 
+          metrics={metrics} 
+          accent={ACCENT} 
+          motion={txt} 
+          position="DELIVER" 
+          drillName="Soapbox" 
+          onRetry={retry} 
+          extra={<AudienceViz energy={metrics?.hasTranscript ? 0.7 : 0.4} restless={0} />}
+        />
       )}
     </div>
   );
