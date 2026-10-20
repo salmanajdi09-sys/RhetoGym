@@ -42,7 +42,6 @@ export default function Soapbox() {
   };
   const shuffle = () => setPrompt(randomPrompt(soapboxPrompts, lang, category, level));
 
-  // Paced to 1-second intervals for mobile CPU efficiency
   useEffect(() => {
     if (phase !== "record") return;
     const start = Date.now();
@@ -68,7 +67,6 @@ export default function Soapbox() {
 
   useEffect(() => {
     if (rec.status === "stopped" && phase === "record") {
-      // 200ms stagger prevents main thread deadlocks when mounting receipt modal
       const timer = setTimeout(() => {
         const dur = Math.min(TOTAL, Math.max(elapsed, 1));
         const mt = computeMetrics(rec.transcript, dur);
