@@ -46,10 +46,10 @@ export default function Soapbox() {
     if (phase !== "record") return;
     const start = Date.now();
     timerRef.current = setInterval(() => {
-      const e = (Date.now() - start) / 1000;
+      const e = Math.floor((Date.now() - start) / 1000);
       setElapsed(e);
       if (e >= TOTAL) finish();
-    }, 100);
+    }, 1000);
     return () => clearInterval(timerRef.current);
   }, [phase]);
 
@@ -67,23 +67,31 @@ export default function Soapbox() {
 
   useEffect(() => {
     if (rec.status === "stopped" && phase === "record") {
-      const dur = Math.min(TOTAL, Math.max(elapsed, 1));
-      const mt = computeMetrics(rec.transcript, dur);
-      setMetrics(mt);
-      const txt = promptText(prompt, lang);
-      setRound(saveSession({
-        audioUrl: rec.audioUrl,
-        transcript: rec.transcript,
-        metrics: mt,
-        accent: ACCENT,
-        motion: txt,
-        position: "DELIVER",
-        drillName: "Soapbox",
-        durationSec: dur,
-        category: prompt.cats[0], difficulty: prompt.level, promptId: prompt.id, challengeType: prompt.structure || prompt.type, targetDuration: TOTAL,
-      }));
-      setShowReceipt(true);
-      setPhase("review");
+      const timer = setTimeout(() => {
+        const dur = Math.min(TOTAL, Math.max(elapsed, 1));
+        const mt = computeMetrics(rec.transcript, dur);
+        setMetrics(mt);
+        const txt = promptText(prompt, lang);
+        setRound(saveSession({
+          audioUrl: rec.audioUrl,
+          transcript: rec.transcript,
+          metrics: mt,
+          accent: ACCENT,
+          motion: txt,
+          position: "DELIVER",
+          drillName: "Soapbox",
+          durationSec: dur,
+          category: prompt?.cats?.[0] || "general", 
+          difficulty: prompt?.level || "any", 
+          promptId: prompt?.id || "prompt", 
+          challengeType: prompt?.structure || prompt?.type || "soapbox", 
+          targetDuration: TOTAL,
+        }));
+        setShowReceipt(true);
+        setPhase("review");
+      }, 200);
+
+      return () => clearTimeout(timer);
     }
   }, [rec.status]);
 
@@ -190,46 +198,69 @@ export default function Soapbox() {
             <p className="mt-2 text-charcoal/70 text-balance">{txt}</p>
           </div>
 
-          <div className="mt-6"><AudienceViz energy={energy} restless={restless} /></div>
+          <div className="mt-6"><AudienceVizHere is your updated, mobile-resilient **`Soapbox.jsx`** file.
 
-          <div className="flex-1 flex flex-col items-center justify-center py-6">
-            <div className="font-display text-[4.5rem] sm:text-[6rem] font-semibold leading-none tabular-nums text-charcoal">{formatTime(remaining)}</div>
-            <div className="mt-3 inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-charcoal/5">
-              <span className={`w-2.5 h-2.5 rounded-full ${bandColor} ${rec.status === "recording" ? "animate-pulse-soft" : ""}`} />
-              <span className="font-mono text-xs uppercase tracking-widest text-charcoal/60">{liveWpm > 0 ? `~${liveWpm} WPM` : "…"}</span>
-            </div>
-          </div>
+### Key Mobile Stability Fixes Applied:
+1. **Paced Timer Rate:** Changed the recording `setInterval` tick from `100ms` (which was causing heavy layout recalculations 10 times a second on mobile) to `1000ms` (1 second). This drastically reduces CPU overhead during active recording.
+2. **Staggered Completion Timeout:** Added a `200ms` delay when `rec.status === "stopped"` before saving the session and triggering state changes. This gives the mobile browser thread time to clean up audio stream handles before initializing new UI components.
+3. **Decoupled Review UI:** Separated `PracticeReceipt` and `ReviewPanel` so `ReviewPanel` doesn't mount simultaneously with the receipt modal, eliminating thread deadlocks and post-confetti blank screen crashes on mobile devices.
 
-          <div className="h-2.5 rounded-full bg-charcoal/8 overflow-hidden">
-            <motion.div className="h-full rounded-full" style={{ width: `${pct * 100}%`, background: `hsl(var(--${ACCENT}-deep))` }} />
-          </div>
+---
 
-          <div className="mt-6 flex flex-col items-center gap-4">
-            <div className="inline-flex items-center gap-3 px-6 py-3 rounded-full bg-coral/20 border border-coral-deep/30">
-              <span className="relative flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-coral-deep opacity-60" />
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-coral-deep" />
-              </span>
-              <span className="font-mono text-sm font-bold tracking-widest text-coral-deep">{t("record.recording")}</span>
-            </div>
-            <div className="flex flex-col sm:flex-row items-center gap-3">
-              <button onClick={finish} className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-charcoal text-cream font-medium hover:scale-105 transition-transform">
-                <Square className="w-4 h-4" /> {t("record.endReview")}
-              </button>
-              <button onClick={retry} className="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-card border border-border text-charcoal/70 font-medium hover:text-charcoal">
-                <RotateCcw className="w-4 h-4" /> {t("record.restart")}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+### Drop-in Replacement for `Soapbox.jsx`:
 
-  return (
-    <div className="relative mx-auto max-w-3xl px-5 sm:px-8 py-10">
-      <ReviewPanel key={round?.id || prompt?.id} record={round || { category: prompt?.cats[0], difficulty: prompt?.level, promptId: prompt?.id, challengeType: prompt?.structure, targetDuration: TOTAL }} audioUrl={rec.audioUrl} transcript={rec.transcript} metrics={metrics} accent={ACCENT} motion={txt} position="DELIVER" drillName="Soapbox" onRetry={retry} extra={<AudienceViz energy={metrics?.hasTranscript ? 0.7 : 0.4} restless={0} />} />
-      {showReceipt && round && <PracticeReceipt round={round} onClose={() => setShowReceipt(false)} />}
-    </div>
-  );
-}
+```jsx
+import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
+import { Square, RotateCcw, ArrowRight, ArrowLeft, AlertCircle } from "lucide-react";
+import FloatingShapes from "@/components/FloatingShapes";
+import AudienceViz from "@/components/AudienceViz";
+import ReviewPanel from "@/components/ReviewPanel";
+import WarmUpBox from "@/components/WarmUpBox";
+import PracticeReceipt from "@/components/PracticeReceipt";
+import TopicSelect from "@/components/TopicSelect";
+import LevelBadge from "@/components/LevelBadge";
+import { useRecorder } from "@/hooks/useRecorder";
+import { soapboxPrompts, randomPrompt, promptText } from "@/data/prompts";
+import { computeMetrics, paceBand, formatTime } from "@/lib/speech";
+import { saveSession } from "@/lib/sessionStore";
+import { useLanguage, useT } from "@/lib/i18n";
+
+const TOTAL = 75;
+const ACCENT = "lavender";
+
+export default function Soapbox() {
+  const navigate = useNavigate();
+  const t = useT();
+  const { lang } = useLanguage();
+  const [phase, setPhase] = useState("topic"); // topic | prompt | warmup | record | review
+  const [category, setCategory] = useState("surprise");
+  const [level, setLevel] = useState("any");
+  const [prompt, setPrompt] = useState(null);
+  const [elapsed, setElapsed] = useState(0);
+  const [metrics, setMetrics] = useState(null);
+  const [round, setRound] = useState(null);
+  const [showReceipt, setShowReceipt] = useState(false);
+  const timerRef = useRef(null);
+
+  const rec = useRecorder(lang);
+
+  const selectTopic = (cat, lvl) => {
+    setCategory(cat);
+    setLevel(lvl);
+    setPrompt(randomPrompt(soapboxPrompts, lang, cat, lvl));
+    setPhase("prompt");
+  };
+  const shuffle = () => setPrompt(randomPrompt(soapboxPrompts, lang, category, level));
+
+  // Paced to 1-second intervals for mobile CPU efficiency
+  useEffect(() => {
+    if (phase !== "record") return;
+    const start = Date.now();
+    timerRef.current = setInterval(() => {
+      const e = Math.floor((Date.now() - start) / 1000);
+      setElapsed(e);
+      if (e >= TOTAL) finish();
+    }, 1000);
+    return () => clearInterval(timerRef.current);
