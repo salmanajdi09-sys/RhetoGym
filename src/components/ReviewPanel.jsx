@@ -63,7 +63,7 @@ export default function ReviewPanel({
     { key: "focus", label: t("review.reflect.focus") },
   ];
 
-  const seekTo = (tm) => { if (tm != null && waveformRef.current) waveformRef.current.seek(tm); };
+  const seekTo = (tm) => { if (tm != null && waveformRef.current && waveformRef.current.seek) waveformRef.current.seek(tm); };
 
   const addMarker = (tm) => {
     const m = { id: Date.now() + Math.random(), time: tm, text: "" };
@@ -73,7 +73,7 @@ export default function ReviewPanel({
   };
 
   const addNoteAtCurrent = () => {
-    const tm = waveformRef.current ? waveformRef.current.getTime() : 0;
+    const tm = waveformRef.current && waveformRef.current.getTime ? waveformRef.current.getTime() : 0;
     addMarker(tm);
   };
 
@@ -148,7 +148,9 @@ export default function ReviewPanel({
           )}
         </div>
         {audioUrl ? (
-          <Waveform ref={waveformRef} audioUrl={audioUrl} markers={markers} onAddMarker={addMarker} onSelectMarker={(mk) => { setActiveNote(mk); setNoteDraft(mk.text || ""); }} onDurationChange={setDuration} accent={accent} />
+          <div className="w-full min-h-[80px]">
+            <Waveform ref={waveformRef} audioUrl={audioUrl} markers={markers} onAddMarker={addMarker} onSelectMarker={(mk) => { setActiveNote(mk); setNoteDraft(mk.text || ""); }} onDurationChange={setDuration} accent={accent} />
+          </div>
         ) : (
           <div className="h-24 sm:h-28 rounded-xl bg-charcoal/5 flex items-center justify-center text-charcoal/40 text-sm text-center px-4">
             {t("review.noAudioBody")}
@@ -190,7 +192,7 @@ export default function ReviewPanel({
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard label={t("review.metrics.pace")} value={m.hasTranscript ? `${m.wpm} WPM` : "—"} sub={m.hasTranscript ? t("review.metrics.target") : t("review.metrics.noTranscript")} accent="sky" />
         <MetricCard label={t("review.metrics.words")} value={m.hasTranscript ? m.wordCount : "—"} sub={m.hasTranscript ? t("review.metrics.spoken") : t("review.metrics.noTranscript")} accent="lavender" />
-        <MetricCard label={t("review.metrics.fillers")} value={m.hasTranscript ? m.fillerCount : "—"} sub={m.hasTranscript && m.fillerList.length ? m.fillerList.slice(0, 2).map((f) => `${f.word} ×${f.count}`).join(", ") : t("review.metrics.detected")} accent="butter" />
+        <MetricCard label={t("review.metrics.fillers")} value={m.hasTranscript ? m.fillerCount : "—"} sub={m.hasTranscript && m.fillerList?.length ? m.fillerList.slice(0, 2).map((f) => `${f.word} ×${f.count}`).join(", ") : t("review.metrics.detected")} accent="butter" />
         <MetricCard label={t("review.metrics.time")} value={formatTime(m.durationSec || 0)} sub={record?.targetDuration ? `/ ${formatTime(record.targetDuration)}` : ""} accent="sage" />
       </div>
 
