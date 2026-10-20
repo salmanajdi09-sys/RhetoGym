@@ -1,6 +1,5 @@
 import { useRef, useState, useCallback, useEffect } from "react";
 
-// Helper to determine a supported MIME type across Desktop, Android, and iOS Safari
 function getSupportedMimeType() {
   if (typeof MediaRecorder === "undefined") return "";
   const types = [
@@ -17,7 +16,7 @@ function getSupportedMimeType() {
 }
 
 export function useRecorder(lang = "en") {
-  const [status, setStatus] = useState("idle"); // idle | recording | stopped | denied
+  const [status, setStatus] = useState("idle");
   const [audioUrl, setAudioUrl] = useState(null);
   const [transcript, setTranscript] = useState("");
   const [micSupported, setMicSupported] = useState(true);
@@ -29,7 +28,6 @@ export function useRecorder(lang = "en") {
   const recognitionRef = useRef(null);
   const finalTextRef = useRef("");
   const langRef = useRef(lang);
-  const isStoppingRef = useRef(false);
 
   useEffect(() => {
     langRef.current = lang;
@@ -44,7 +42,6 @@ export function useRecorder(lang = "en") {
     finalTextRef.current = "";
     setTranscript("");
     setAudioUrl(null);
-    isStoppingRef.current = false;
 
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       setStatus("denied");
@@ -52,7 +49,14 @@ export function useRecorder(lang = "en") {
     }
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // 1. Acquire single, persistent Audio Stream
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        } 
+      });
       streamRef.current = stream;
 
       const mimeType = getSupportedMimeType();
@@ -75,6 +79,7 @@ export function useRecorder(lang = "en") {
         } catch (e) {
           console.error("Failed to process recorded audio Blob:", e);
         } finally {
+          // Release mic stream ONLY after MediaRecorder finishes
           if (streamRef.current) {
             streamRef.current.getTracks().forEach((t) => t.stop());
             streamRef.current = null;
@@ -83,10 +88,12 @@ export function useRecorder(lang = "en") {
         }
       };
 
+      // Continuous 1-second timeslices keep mobile CPU cool
       mr.start(1000);
       mediaRecorderRef.current = mr;
       setStatus("recording");
 
+      // 2. Isolated Speech Recognition (Never restarts automatically on end)
       const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (SR) {
         try {
@@ -105,16 +112,15 @@ export function useRecorder(lang = "en") {
             setTranscript((finalTextRef.current + interim).trim());
           };
 
-          rec.onerror = (err) => {
-            console.warn("Speech recognition notice:", err);
-          };
-
+          // SILENT HANDLING: If speech recognition stops or times out on mobile,
+          // do NOT attempt to restart it. Let MediaRecorder continue uninterrupted.
+          rec.onerror = () => {};
           rec.onend = () => {};
 
           rec.start();
           recognitionRef.current = rec;
         } catch (e) {
-          console.warn("Could not start Web Speech API:", e);
+          console.warn("Speech recognition initialization skipped:", e);
         }
       }
     } catch (err) {
@@ -124,16 +130,17 @@ export function useRecorder(lang = "en") {
   }, []);
 
   const stop = useCallback(() => {
-    isStoppingRef.current = true;
-
+    // Stop speech recognition quietly
     if (recognitionRef.current) {
       try {
         recognitionRef.current.onend = null;
+        recognitionRef.current.onerror = null;
         recognitionRef.current.stop();
       } catch (e) {}
       recognitionRef.current = null;
     }
 
+    // Stop MediaRecorder (stream tracks stop safely in mr.onstop)
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
       try {
         mediaRecorderRef.current.stop();
@@ -159,7 +166,6 @@ export function useRecorder(lang = "en") {
     setTranscript("");
     setStatus("idle");
     finalTextRef.current = "";
-    isStoppingRef.current = false;
   }, [audioUrl]);
 
   useEffect(() => {
