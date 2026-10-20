@@ -51,14 +51,17 @@ export default function ThinkFast() {
     return () => clearTimeout(tm);
   }, [phase, count]);
 
+  // Optimized to 1000ms (1 second) to prevent mobile CPU strain and mic indicator twitching
   useEffect(() => {
     if (phase !== "record") return;
     const start = Date.now();
     timerRef.current = setInterval(() => {
-      const e = (Date.now() - start) / 1000;
+      const e = Math.floor((Date.now() - start) / 1000);
       setElapsed(e);
-      if (e >= SPEAK) finish();
-    }, 100);
+      if (e >= SPEAK) {
+        finish();
+      }
+    }, 1000);
     return () => clearInterval(timerRef.current);
   }, [phase]);
 
