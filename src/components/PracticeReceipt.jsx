@@ -7,7 +7,6 @@ import { randomCelebration } from "@/data/celebrations";
 import { formatTime } from "@/lib/speech";
 import { useLanguage, useT } from "@/lib/i18n";
 
-// Explicit palette (no CSS vars) so html2canvas captures the receipt faithfully.
 const C = {
   cream: "hsl(42, 40%, 95%)",
   creamDeep: "hsl(40, 32%, 90%)",
@@ -52,38 +51,47 @@ function Metric({ label, value, delay }) {
       style={{ border: `1px solid ${C.creamDeep}`, borderRadius: 14, padding: "10px 12px", background: "hsl(42, 44%, 98%)" }}
     >
       <div style={{ fontSize: 9, letterSpacing: "0.12em", textTransform: "uppercase", fontFamily: "ui-monospace, monospace", color: "hsl(240, 8%, 45%)" }}>{label}</div>
-      <div style={{ fontSize: 17, fontFamily: "Fraunces, Georgia, serif", color: C.charcoal, marginTop: 2, lineHeight: 1.15, wordBreak: "break-word" }}>{value}</div>
+      <div style={{ fontSize: 17, fontFamily: "Fraunces, Georgia, serif", color: C.charcoal, marginTop: 2, lineHeight: 1.15, wordBreak: "break-word" }}>{value || "—"}</div>
     </motion.div>
   );
 }
 
-export default function PracticeReceipt({ round, onClose }) {
+export default function PracticeReceipt({ round = {}, onClose }) {
   const t = useT();
-  const { lang } = useLanguage();
+  const { lang = "en" } = useLanguage ? useLanguage() : {};
   const cardRef = useRef(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  const celebration = useMemo(() => randomCelebration(lang), [lang]);
+  const celebration = useMemo(() => {
+    try {
+      return randomCelebration(lang) || "Great Job!";
+    } catch {
+      return "Great Job!";
+    }
+  }, [lang]);
 
+  // Safely fire confetti without letting mobile canvas crash the app
   useEffect(() => {
-    const colors = [C.lavender, C.sky, C.coral, C.butter, C.sage];
-    confetti({ particleCount: 60, spread: 70, origin: { y: 0.5 }, colors, scalar: 0.8, ticks: 160, disableForReducedMotion: true, zIndex: 200 });
-    const id = setTimeout(() => confetti({ particleCount: 30, spread: 50, origin: { y: 0.45 }, colors, scalar: 0.65, ticks: 120, disableForReducedMotion: true, zIndex: 200 }), 200);
-    return () => clearTimeout(id);
+    try {
+      const colors = [C.lavender, C.sky, C.coral, C.butter, C.sage];
+      confetti({ particleCount: 50, spread: 60, origin: { y: 0.5 }, colors, scalar: 0.8, ticks: 120, disableForReducedMotion: true, zIndex: 200 });
+    } catch (e) {
+      console.warn("Confetti ignored on this device:", e);
+    }
   }, []);
 
   const m = round?.metrics || {};
-  const topic = round?.motion || "";
+  const topic = round?.motion || round?.prompt || "Practice Round";
   const position = round?.position || "";
   const showPosition = position && !["DELIVER", "SPEAK"].includes(position);
-  const hasTranscript = m.hasTranscript;
+  const hasTranscript = Boolean(m?.hasTranscript);
 
   const dateStr = useMemo(() => {
     try {
       const d = new Date(round?.completedAt || Date.now());
       return new Intl.DateTimeFormat(lang === "fr" ? "fr-FR" : "en-US", { month: "short", day: "numeric", year: "numeric" }).format(d);
-    } catch { return ""; }
+    } catch { return "Today"; }
   }, [round?.completedAt, lang]);
 
   const timeStr = useMemo(() => {
@@ -99,9 +107,15 @@ export default function PracticeReceipt({ round, onClose }) {
     return [r.well, r.change, r.focus].filter(Boolean).join(" ");
   }, [round?.reflection]);
 
-  const fillerText = hasTranscript && m.fillerCount > 0
-    ? `${m.fillerCount} (${(m.fillerList || []).slice(0, 2).map((f) => f.word).join(", ")})`
-    : hasTranscript ? t("receipt.none") : "—";
+  const fillerText = hasTranscript && m?.fillerCount > 0
+    ? `${m.fillerCount}`
+    : hasTranscript ? (t ? t("receipt.none") : "None") : "—";
+
+  const safeClose = () => {
+    if (typeof onClose === "function") {
+      onClose();
+    }
+  };
 
   const handleSave = async () => {
     if (!cardRef.current) return;
@@ -109,11 +123,10 @@ export default function PracticeReceipt({ round, onClose }) {
     setError("");
     
     try {
-      // Reduced scale for mobile safety to prevent memory crashes
-      const isMobile = window.innerWidth < 768;
+      const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
       const canvas = await html2canvas(cardRef.current, { 
         backgroundColor: C.cream, 
-        scale: isMobile ? 1.5 : 2, 
+        scale: isMobile ? 1.2 : 2, 
         useCORS: true, 
         logging: false 
       });
@@ -127,107 +140,84 @@ export default function PracticeReceipt({ round, onClose }) {
       document.body.removeChild(a);
     } catch (err) {
       console.error("Capture failed:", err);
-      setError(t("receipt.saveError") || "Could not save image on this device.");
+      setError("Could not save image on this device.");
     } finally { 
       setBusy(false); 
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto">
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="absolute inset-0 bg-charcoal/40 backdrop-blur-sm" onClick={onClose} />
+    <div className="fixed inset-0 z-50 overflow-y-auto p-4 sm:p-6 flex min-h-full items-center justify-center">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="fixed inset-0 bg-charcoal/40 backdrop-blur-sm" onClick={safeClose} />
 
       <motion.div
         initial={{ opacity: 0, scale: 0.92, y: 16 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ type: "spring", stiffness: 240, damping: 24 }}
-        className="relative z-10 w-full max-w-md my-auto"
+        className="relative z-10 w-full max-w-md my-auto max-h-[90vh] overflow-y-auto rounded-[28px] bg-cream shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <button onClick={onClose} aria-label={t("receipt.close")} className="absolute -top-3 -right-3 z-20 w-10 h-10 rounded-full bg-card border border-border flex items-center justify-center text-charcoal/60 hover:text-charcoal hover:scale-105 transition-transform shadow-md">
+        <button onClick={safeClose} aria-label="Close" className="absolute top-3 right-3 z-20 w-10 h-10 rounded-full bg-card border border-border flex items-center justify-center text-charcoal/60 hover:text-charcoal hover:scale-105 transition-transform shadow-md">
           <X className="w-4 h-4" />
         </button>
 
-        {/* The receipt card — captured for save */}
+        {/* The receipt card */}
         <div ref={cardRef} style={{ background: C.cream, borderRadius: 28, overflow: "hidden", position: "relative" }}>
-          {/* decorative blobs */}
-          <div style={{ position: "absolute", top: -40, left: -30, width: 150, height: 150, borderRadius: "42% 58% 67% 33% / 42% 48% 52% 58%", background: C.lavender, opacity: 0.4 }} />
-          <div style={{ position: "absolute", bottom: -50, right: -20, width: 160, height: 160, borderRadius: "63% 37% 38% 62% / 61% 35% 65% 39%", background: C.coral, opacity: 0.3 }} />
-          <div style={{ position: "absolute", top: 80, right: -30, width: 90, height: 90, borderRadius: "50%", background: C.butter, opacity: 0.45 }} />
-
-          <div style={{ position: "relative", padding: "30px 26px 24px" }}>
-            {/* logo + wordmark + complete badge */}
+          <div style={{ position: "relative", padding: "30px 24px 24px" }}>
+            
+            {/* Header */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <ReceiptLogo />
-                <span style={{ fontFamily: "Fraunces, Georgia, serif", fontSize: 22, fontWeight: 600, color: C.charcoal, letterSpacing: "-0.02em" }}>
+                <span style={{ fontFamily: "Fraunces, Georgia, serif", fontSize: 22, fontWeight: 600, color: C.charcoal }}>
                   RHETO<span style={{ color: C.skyDeep }}>GYM</span>
                 </span>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: 100, background: `hsl(152, 24%, 66%, 0.25)`, border: `1px solid hsl(152, 28%, 54%, 0.3)` }}>
-                <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
-                  <path d="M2.5 6.5L5 9L9.5 3.5" stroke={C.sageDeep} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                <span style={{ fontSize: 8, letterSpacing: "0.14em", textTransform: "uppercase", fontFamily: "ui-monospace, monospace", fontWeight: 700, color: C.sageDeep }}>{t("receipt.eyebrow")}</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: 100, background: `hsl(152, 24%, 66%, 0.25)` }}>
+                <span style={{ fontSize: 8, letterSpacing: "0.14em", textTransform: "uppercase", fontFamily: "ui-monospace, monospace", fontWeight: 700, color: C.sageDeep }}>COMPLETE</span>
               </div>
             </div>
 
-            {/* celebration */}
-            <div style={{ marginTop: 20 }}>
-              <div style={{ fontFamily: "Fraunces, Georgia, serif", fontSize: 30, fontWeight: 600, color: C.charcoal, lineHeight: 1.1 }}>{celebration}</div>
+            {/* Celebration */}
+            <div style={{ marginTop: 18 }}>
+              <div style={{ fontFamily: "Fraunces, Georgia, serif", fontSize: 26, fontWeight: 600, color: C.charcoal, lineHeight: 1.1 }}>{celebration}</div>
             </div>
 
-            {/* topic — the visual star */}
-            <div style={{ marginTop: 18, borderRadius: 20, padding: "18px 18px", background: `hsl(262, 64%, 77%, 0.28)`, border: `1px solid hsl(262, 48%, 45%, 0.18)` }}>
-              <div style={{ fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", fontFamily: "ui-monospace, monospace", color: "hsl(240, 8%, 45%)" }}>{t("receipt.topicLabel")}</div>
-              <div style={{ fontFamily: "Fraunces, Georgia, serif", fontSize: 22, fontWeight: 500, color: C.charcoal, marginTop: 6, lineHeight: 1.25 }}>{topic}</div>
+            {/* Topic */}
+            <div style={{ marginTop: 16, borderRadius: 20, padding: "16px", background: `hsl(262, 64%, 77%, 0.28)` }}>
+              <div style={{ fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", fontFamily: "ui-monospace, monospace", color: "hsl(240, 8%, 45%)" }}>Topic</div>
+              <div style={{ fontFamily: "Fraunces, Georgia, serif", fontSize: 18, fontWeight: 500, color: C.charcoal, marginTop: 4, lineHeight: 1.25 }}>{topic}</div>
             </div>
 
-            {/* position */}
-            {showPosition && (
-              <div style={{ marginTop: 12, fontSize: 14, color: "hsl(240, 8%, 40%)", display: "flex", alignItems: "baseline", gap: 8 }}>
-                <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase" }}>{t("receipt.position")}</span>
-                <span style={{ fontFamily: "Fraunces, Georgia, serif", fontSize: 18, color: C.charcoal }}>{position}</span>
-              </div>
-            )}
-
-            {/* metrics grid */}
-            <div style={{ marginTop: 18, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 8 }}>
-              <Metric label={t("receipt.mode")} value={round?.drillName || "—"} delay={0.15} />
-              <Metric label={t("receipt.duration")} value={formatTime(round?.durationSec || 0)} delay={0.2} />
-              <Metric label={t("receipt.pace")} value={hasTranscript ? `${m.wpm} WPM` : "—"} delay={0.25} />
-              <Metric label={t("receipt.words")} value={hasTranscript ? m.wordCount : "—"} delay={0.3} />
-              <Metric label={t("receipt.fillers")} value={fillerText} delay={0.35} />
-              <Metric label={t("receipt.date")} value={dateStr} delay={0.4} />
+            {/* Metrics grid */}
+            <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 8 }}>
+              <Metric label="Mode" value={round?.drillName || "Practice"} delay={0.1} />
+              <Metric label="Duration" value={formatTime ? formatTime(round?.durationSec || 0) : `${round?.durationSec || 0}s`} delay={0.15} />
+              <Metric label="Pace" value={hasTranscript ? `${m?.wpm || 0} WPM` : "—"} delay={0.2} />
+              <Metric label="Words" value={hasTranscript ? m?.wordCount : "—"} delay={0.25} />
+              <Metric label="Fillers" value={fillerText} delay={0.3} />
+              <Metric label="Date" value={dateStr} delay={0.35} />
             </div>
 
-            {/* reflection */}
-            {reflectionText && (
-              <div style={{ marginTop: 14, borderRadius: 16, padding: "12px 14px", background: "hsl(44, 78%, 74%, 0.22)", border: `1px solid hsl(42, 76%, 60%, 0.25)` }}>
-                <div style={{ fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", fontFamily: "ui-monospace, monospace", color: "hsl(240, 8%, 45%)" }}>{t("receipt.reflection")}</div>
-                <div style={{ fontSize: 13, color: C.charcoal, marginTop: 4, lineHeight: 1.4 }}>{reflectionText}</div>
-              </div>
-            )}
-
-            {/* divider + branding */}
-            <div style={{ marginTop: 20, borderTop: `1.5px dashed ${C.creamDeep}`, paddingTop: 14, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <span style={{ fontFamily: "Fraunces, Georgia, serif", fontSize: 13, color: "hsl(240, 8%, 40%)", fontStyle: "italic" }}>{t("receipt.practicedWith")}</span>
-              <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 11, color: "hsl(240, 8%, 50%)" }}>{timeStr}</span>
+            {/* Footer */}
+            <div style={{ marginTop: 18, borderTop: `1.5px dashed ${C.creamDeep}`, paddingTop: 12, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ fontFamily: "Fraunces, Georgia, serif", fontSize: 12, color: "hsl(240, 8%, 40%)", fontStyle: "italic" }}>Practiced with RhetoGym</span>
+              <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 10, color: "hsl(240, 8%, 50%)" }}>{timeStr}</span>
             </div>
           </div>
         </div>
 
-        {/* actions */}
-        <div className="flex items-center justify-center gap-3 mt-5">
-          <button onClick={handleSave} disabled={busy} className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full bg-charcoal text-cream font-semibold hover:scale-[1.03] transition-transform disabled:opacity-50 shadow-lg shadow-charcoal/10">
-            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />} {t("receipt.save")}
+        {/* Action buttons */}
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 p-4 pt-0">
+          <button onClick={handleSave} disabled={busy} className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-charcoal text-cream font-semibold hover:scale-[1.02] transition-transform disabled:opacity-50">
+            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />} Save Receipt
           </button>
           
-          <button onClick={onClose} className="px-6 py-3.5 rounded-full bg-card border border-border text-charcoal font-semibold hover:bg-muted transition-colors">
-            {t("common.close") || "Continue to Review"}
+          <button onClick={safeClose} className="w-full sm:w-auto px-6 py-3 rounded-full border border-charcoal/20 text-charcoal font-semibold hover:bg-black/5 transition-colors">
+            Continue to Review
           </button>
         </div>
-        {error && <p className="text-center text-sm text-destructive mt-3">{error}</p>}
+        {error && <p className="text-center text-xs text-red-500 pb-3">{error}</p>}
       </motion.div>
     </div>
   );
