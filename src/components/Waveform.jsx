@@ -229,4 +229,35 @@ const Waveform = forwardRef(function Waveform(
         onEnded={() => setPlaying(false)}
         className="hidden"
       />
-      <div className="mt-4 flex items-center justify
+      <div className="mt-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={toggle}
+            disabled={!ready}
+            className="w-12 h-12 rounded-full bg-charcoal text-cream flex items-center justify-center hover:scale-105 transition-transform disabled:opacity-40"
+            aria-label={playing ? "Pause" : "Play"}
+          >
+            {playing ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
+          </button>
+          <button
+            onClick={replay}
+            disabled={!ready}
+            className="w-10 h-10 rounded-full bg-charcoal/8 text-charcoal flex items-center justify-center hover:bg-charcoal/15 transition-colors disabled:opacity-40"
+            aria-label="Replay from start"
+          >
+            <RotateCcw className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="font-mono text-sm text-charcoal/60 tabular-nums">
+          {formatTime(current)} <span className="text-charcoal/30">/</span> {formatTime(duration)}
+        </div>
+      </div>
+      {!ready && audioUrl && (
+        <p className="mt-2 text-xs text-charcoal/40 font-mono">Rendering waveform…</p>
+      )}
+      <p className="mt-1 text-xs text-charcoal/40">Tip: click the waveform to drop a note at that moment.</p>
+    </div>
+  );
+});
+
+export default Waveform;
