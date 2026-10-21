@@ -36,14 +36,13 @@ export default function ReviewPanel({
   const t = useT();
   const waveformRef = useRef(null);
 
-  // Safe UUID generator supporting non-secure contexts/older mobile browsers
   const generateId = () => {
     try {
       if (typeof crypto !== "undefined" && crypto.randomUUID) {
         return crypto.randomUUID();
       }
     } catch (e) {}
-    return "rev_" + Math.random().toString(36.2) + Date.now().toString(36);
+    return "rev_" + Math.random().toString(36).substring(2) + Date.now().toString(36);
   };
 
   const [existing] = useState(() => {
@@ -322,4 +321,23 @@ export default function ReviewPanel({
         )}
       </div>
 
-      {saveError && <p role="alert
+      {saveError && <p role="alert" className="text-center text-sm text-destructive">{saveError}</p>}
+      {saved && (
+        <p className="text-center text-sm text-charcoal/50 -mt-4 pb-2">
+          {t("review.savedBody") || "View all your past sessions in"}{" "}
+          <Link to="/review" className="underline hover:text-charcoal">{t("review.openStudio") || "Studio"}</Link>
+        </p>
+      )}
+    </div>
+  );
+}
+
+function MetricCard({ label, value, sub, accent }) {
+  return (
+    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className={`rounded-2xl border border-border/60 bg-${accent}/15 p-4`}>
+      <span className="font-mono text-xs uppercase tracking-widest text-charcoal/50">{label}</span>
+      <div className="font-display text-3xl text-charcoal mt-1" style={{ color: `hsl(var(--${accent}-deep))` }}>{value}</div>
+      <span className="text-xs text-charcoal/50">{sub}</span>
+    </motion.div>
+  );
+}
