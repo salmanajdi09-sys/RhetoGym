@@ -2,8 +2,6 @@ import { forwardRef, useImperativeHandle, useEffect, useRef, useState } from "re
 import { Play, Pause, RotateCcw } from "lucide-react";
 import { formatTime } from "@/lib/speech";
 
-// Canvas waveform player with annotation markers, click-to-annotate, and an
-// imperative seek handle so the transcript / notes can jump to a moment.
 const Waveform = forwardRef(function Waveform(
   { audioUrl, markers = [], onAddMarker, onSelectMarker, onDurationChange, accent = "coral" },
   ref
@@ -19,11 +17,13 @@ const Waveform = forwardRef(function Waveform(
 
   useImperativeHandle(ref, () => ({
     seek: (t) => {
-      const a = audioRef.current;
-      if (!a) return;
-      a.currentTime = t;
-      setCurrent(t);
-      setProgress(a.duration ? t / a.duration : 0);
+      try {
+        const a = audioRef.current;
+        if (!a) return;
+        a.currentTime = t;
+        setCurrent(t);
+        setProgress(a.duration ? t / a.duration : 0);
+      } catch (e) {}
     },
     getTime: () => (audioRef.current ? audioRef.current.currentTime : 0),
     play: () => {
@@ -36,9 +36,13 @@ const Waveform = forwardRef(function Waveform(
     },
   }));
 
-  // decode + build bars safely with mobile fallback
+  // Safe audio decoder with mobile fallback
   useEffect(() => {
-    if (!audioUrl) return;
+    if (!audioUrl) {
+      setBars(Array(110).fill(0.3));
+      setReady(true);
+      return;
+    }
     let cancelled = false;
     setReady(false);
     setBars([]);
@@ -46,6 +50,7 @@ const Waveform = forwardRef(function Waveform(
     (async () => {
       try {
         const res = await fetch(audioUrl);
+        if (!res.ok) throw new Error("Audio fetch failed");
         const ab = await res.arrayBuffer();
         if (cancelled) return;
 
@@ -53,8 +58,18 @@ const Waveform = forwardRef(function Waveform(
         if (AC) {
           const ctx = new AC();
           try {
-            const buf = await ctx.decodeAudioData(ab.slice(0));
-            if (ctx.state !== "closed") await ctx.close();
+            // Safari/WebKit fallback for decodeAudioData
+            const decodePromise = new Promise((resolve, reject) => {
+              const res = ctx.decodeAudioData(ab.slice(0), resolve, reject);
+              if (res && typeof res.then === "function") {
+                res.then(resolve).catch(reject);
+              }
+            });
+
+            const buf = await decodePromise;
+            if (ctx.state !== "closed" && typeof ctx.close === "function") {
+              await ctx.close();
+            }
             if (cancelled) return;
 
             const data = buf.getChannelData(0);
@@ -72,8 +87,6 @@ const Waveform = forwardRef(function Waveform(
             const peak = Math.max(...out, 0.01);
             setBars(out.map((v) => Math.max(0.04, v / peak)));
           } catch (decodeErr) {
-            console.warn("AudioContext decode failed on mobile, using fallback bars:", decodeErr);
-            // Fallback placeholder bars so mobile doesn't break
             setBars(Array(110).fill(0.3));
           }
         } else {
@@ -81,7 +94,6 @@ const Waveform = forwardRef(function Waveform(
         }
         setReady(true);
       } catch (err) {
-        console.warn("Waveform load error:", err);
         setBars(Array(110).fill(0.3));
         setReady(true);
       }
@@ -92,58 +104,74 @@ const Waveform = forwardRef(function Waveform(
     };
   }, [audioUrl]);
 
-  // draw
+  // Safe canvas rendering loop
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
-    if (!rect.width) return;
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const W = rect.width,
-      H = rect.height;
-    ctx.clearRect(0, 0, W, H);
-    const n = bars.length;
-    if (!n) return;
-    const gap = 3;
-    const bw = (W - gap * (n - 1)) / n;
-    bars.forEach((v, i) => {
-      const x = i * (bw + gap);
-      const h = Math.max(3, v * H * 0.92);
-      const played = i / n <= progress;
-      ctx.fillStyle = played ? `hsl(var(--${accent}-deep))` : "hsl(var(--charcoal) / 0.16)";
-      const y = (H - h) / 2;
-      ctx.beginPath();
-      if (ctx.roundRect) ctx.roundRect(x, y, bw, h, bw / 2);
-      else ctx.rect(x, y, bw, h);
-      ctx.fill();
-    });
-    // playhead
-    const px = progress * W;
-    ctx.fillStyle = "hsl(var(--charcoal))";
-    ctx.fillRect(px - 1, 0, 2, H);
-    // markers
-    markers.forEach((m) => {
-      if (!duration) return;
-      const x = (m.time / duration) * W;
-      ctx.fillStyle = "hsl(var(--butter-deep))";
-      ctx.beginPath();
-      ctx.arc(x, 10, 5, 0, Math.PI * 2);
-      ctx.fill();
+    try {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      if (!rect.width) return;
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const W = rect.width,
+        H = rect.height;
+      ctx.clearRect(0, 0, W, H);
+      const n = bars.length;
+      if (!n) return;
+      const gap = 3;
+      const bw = (W - gap * (n - 1)) / n;
+
+      bars.forEach((v, i) => {
+        const x = i * (bw + gap);
+        const h = Math.max(3, v * H * 0.92);
+        const played = i / n <= progress;
+        ctx.fillStyle = played ? `hsl(var(--${accent}-deep))` : "hsl(var(--charcoal) / 0.16)";
+        const y = (H - h) / 2;
+
+        ctx.beginPath();
+        // Safe rounded rectangle fallback for mobile browsers
+        if (typeof ctx.roundRect === "function") {
+          try {
+            ctx.roundRect(x, y, bw, h, bw / 2);
+          } catch (e) {
+            ctx.rect(x, y, bw, h);
+          }
+        } else {
+          ctx.rect(x, y, bw, h);
+        }
+        ctx.fill();
+      });
+
+      // Playhead indicator
+      const px = progress * W;
       ctx.fillStyle = "hsl(var(--charcoal))";
-      ctx.beginPath();
-      ctx.arc(x, 10, 2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = "hsl(var(--butter-deep) / 0.6)";
-      ctx.beginPath();
-      ctx.moveTo(x, 14);
-      ctx.lineTo(x, H);
-      ctx.stroke();
-    });
+      ctx.fillRect(px - 1, 0, 2, H);
+
+      // Marker annotations
+      markers.forEach((m) => {
+        if (!duration) return;
+        const x = (m.time / duration) * W;
+        ctx.fillStyle = "hsl(var(--butter-deep))";
+        ctx.beginPath();
+        ctx.arc(x, 10, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "hsl(var(--charcoal))";
+        ctx.beginPath();
+        ctx.arc(x, 10, 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "hsl(var(--butter-deep) / 0.6)";
+        ctx.beginPath();
+        ctx.moveTo(x, 14);
+        ctx.lineTo(x, H);
+        ctx.stroke();
+      });
+    } catch (err) {
+      console.warn("Canvas render safeguard caught error:", err);
+    }
   }, [bars, progress, markers, duration, accent]);
 
   const toggle = () => {
@@ -165,18 +193,20 @@ const Waveform = forwardRef(function Waveform(
   };
 
   const handleCanvasClick = (e) => {
-    const canvas = canvasRef.current;
-    const a = audioRef.current;
-    if (!canvas || !a || !duration) return;
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const t = (x / rect.width) * duration;
-    const near = markers.find((m) => Math.abs(m.time - t) < 0.6);
-    if (near && onSelectMarker) {
-      onSelectMarker(near);
-      return;
-    }
-    if (onAddMarker) onAddMarker(t);
+    try {
+      const canvas = canvasRef.current;
+      const a = audioRef.current;
+      if (!canvas || !a || !duration) return;
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const t = (x / rect.width) * duration;
+      const near = markers.find((m) => Math.abs(m.time - t) < 0.6);
+      if (near && onSelectMarker) {
+        onSelectMarker(near);
+        return;
+      }
+      if (onAddMarker) onAddMarker(t);
+    } catch (e) {}
   };
 
   return (
@@ -199,39 +229,3 @@ const Waveform = forwardRef(function Waveform(
           const a = e.target;
           setCurrent(a.currentTime);
           setProgress(a.duration ? a.currentTime / a.duration : 0);
-        }}
-        onEnded={() => setPlaying(false)}
-        className="hidden"
-      />
-      <div className="mt-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={toggle}
-            disabled={!ready}
-            className="w-12 h-12 rounded-full bg-charcoal text-cream flex items-center justify-center hover:scale-105 transition-transform disabled:opacity-40"
-            aria-label={playing ? "Pause" : "Play"}
-          >
-            {playing ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
-          </button>
-          <button
-            onClick={replay}
-            disabled={!ready}
-            className="w-10 h-10 rounded-full bg-charcoal/8 text-charcoal flex items-center justify-center hover:bg-charcoal/15 transition-colors disabled:opacity-40"
-            aria-label="Replay from start"
-          >
-            <RotateCcw className="w-4 h-4" />
-          </button>
-        </div>
-        <div className="font-mono text-sm text-charcoal/60 tabular-nums">
-          {formatTime(current)} <span className="text-charcoal/30">/</span> {formatTime(duration)}
-        </div>
-      </div>
-      {!ready && audioUrl && (
-        <p className="mt-2 text-xs text-charcoal/40 font-mono">Rendering waveform…</p>
-      )}
-      <p className="mt-1 text-xs text-charcoal/40">Tip: click the waveform to drop a note at that moment.</p>
-    </div>
-  );
-});
-
-export default Waveform;
