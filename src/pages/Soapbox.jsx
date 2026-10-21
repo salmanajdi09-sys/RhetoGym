@@ -22,14 +22,13 @@ export default function Soapbox() {
   const navigate = useNavigate();
   const t = useT();
   const { lang } = useLanguage();
-  const [phase, setPhase] = useState("topic"); // topic | prompt | warmup | record | review
+  const [phase, setPhase] = useState("topic"); // topic | prompt | warmup | record | receipt | review
   const [category, setCategory] = useState("surprise");
   const [level, setLevel] = useState("any");
   const [prompt, setPrompt] = useState(null);
   const [elapsed, setElapsed] = useState(0);
   const [metrics, setMetrics] = useState(null);
   const [round, setRound] = useState(null);
-  const [showReceipt, setShowReceipt] = useState(false);
   const timerRef = useRef(null);
 
   const rec = useRecorder(lang);
@@ -87,8 +86,7 @@ export default function Soapbox() {
           challengeType: prompt?.structure || prompt?.type || "soapbox", 
           targetDuration: TOTAL,
         }));
-        setShowReceipt(true);
-        setPhase("review");
+        setPhase("receipt"); // Automatically opens the receipt screen after recording
       }, 200);
 
       return () => clearTimeout(timer);
@@ -101,7 +99,6 @@ export default function Soapbox() {
     setElapsed(0);
     setMetrics(null);
     setRound(null);
-    setShowReceipt(false);
     setPhase("prompt");
   };
 
@@ -234,11 +231,19 @@ export default function Soapbox() {
     );
   }
 
-return (
-    <div className="relative mx-auto max-w-3xl px-5 sm:px-8 py-10">
-      {showReceipt && round ? (
-        <PracticeReceipt round={round} onClose={() => setShowReceipt(false)} />
-      ) : (
+  // Phase 1: Show Receipt first after recording
+  if (phase === "receipt" && round) {
+    return (
+      <div className="relative mx-auto max-w-3xl px-5 sm:px-8 py-10">
+        <PracticeReceipt round={round} onClose={() => setPhase("review")} />
+      </div>
+    );
+  }
+
+  // Phase 2: Show Full Review Panel when clicking "Continue to Review"
+  if (phase === "review") {
+    return (
+      <div className="relative mx-auto max-w-3xl px-5 sm:px-8 py-10">
         <ReviewPanel 
           key={round?.id || prompt?.id || "review"} 
           record={round || { category: prompt?.cats?.[0], difficulty: prompt?.level, promptId: prompt?.id, challengeType: prompt?.structure, targetDuration: TOTAL }} 
@@ -252,7 +257,9 @@ return (
           onRetry={retry} 
           extra={<AudienceViz energy={metrics?.hasTranscript ? 0.7 : 0.4} restless={0} />}
         />
-      )}
-    </div>
-  );
+      </div>
+    );
+  }
+
+  return null;
 }
