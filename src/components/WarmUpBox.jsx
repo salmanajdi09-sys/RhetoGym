@@ -1,17 +1,15 @@
 import { useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Dices, SkipForward, RefreshCw, ArrowRight, Check } from "lucide-react";
+import { Dices, RefreshCw, ArrowRight, Check, Play } from "lucide-react";
 import WarmUpChallenge from "@/components/warmup/WarmUpChallenge";
 import WarmUpTimer from "@/components/warmup/WarmUpTimer";
 import { warmups, pickWarmUp } from "@/data/warmups";
 import { useLanguage, useT } from "@/lib/i18n";
 
-// Optional 10-20 second arcade warm-up before a full training round.
-// Disposable: no score, no history, no recording. Skip anytime.
 export default function WarmUpBox({ onContinue, accent = "lavender" }) {
   const t = useT();
   const { lang } = useLanguage();
-  const [view, setView] = useState("idle"); // idle | active | done
+  const [view, setView] = useState("idle"); // idle | reading | active | done
   const [current, setCurrent] = useState(null);
   const [step, setStep] = useState(0);
   const [doneMsg, setDoneMsg] = useState("");
@@ -24,12 +22,17 @@ export default function WarmUpBox({ onContinue, accent = "lavender" }) {
     lastType.current = next.type;
     setCurrent(next);
     setStep(0);
-    setView("active");
+    setView("reading"); // First show the challenge to read without the timer running!
   }, []);
+
+  const startTimer = () => {
+    setView("active"); // Now start the countdown timer
+  };
 
   const handleTimerDone = useCallback(() => {
     if (current?.type === "three" && step < 2) {
       setStep((s) => s + 1);
+      setView("reading"); // Pause between steps so they can read the next one
     } else {
       const msgs = t("warmup.doneMessages");
       setDoneMsg(Array.isArray(msgs) ? msgs[Math.floor(Math.random() * msgs.length)] : "Nice!");
@@ -66,6 +69,25 @@ export default function WarmUpBox({ onContinue, accent = "lavender" }) {
             </motion.div>
           )}
 
+          {/* Reading Phase: See the prompt first without timer pressure */}
+          {view === "reading" && current && (
+            <motion.div key="reading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col items-center gap-7 py-4 text-center">
+              <WarmUpChallenge warmup={current} step={step} lang={lang} />
+              <button onClick={startTimer} className="group inline-flex items-center gap-2 px-7 py-3.5 rounded-full bg-charcoal text-cream font-semibold text-lg hover:scale-[1.03] transition-transform shadow-lg shadow-charcoal/10">
+                <Play className="w-5 h-5 fill-current" /> Start Challenge
+              </button>
+              <div className="flex items-center gap-4">
+                <button onClick={roll} className="inline-flex items-center gap-1.5 text-sm text-charcoal/50 hover:text-charcoal">
+                  <RefreshCw className="w-4 h-4" /> {t("warmup.another")}
+                </button>
+                <button onClick={onContinue} className="inline-flex items-center gap-1.5 text-sm text-charcoal/50 hover:text-charcoal">
+                  {t("warmup.skip")} <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Active Phase: Timer is running */}
           {view === "active" && current && (
             <motion.div key="active" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col items-center gap-7 py-4">
               <WarmUpChallenge warmup={current} step={step} lang={lang} />
