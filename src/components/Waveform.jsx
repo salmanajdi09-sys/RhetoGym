@@ -58,7 +58,6 @@ const Waveform = forwardRef(function Waveform(
         if (AC) {
           const ctx = new AC();
           try {
-            // Safari/WebKit fallback for decodeAudioData
             const decodePromise = new Promise((resolve, reject) => {
               const res = ctx.decodeAudioData(ab.slice(0), resolve, reject);
               if (res && typeof res.then === "function") {
@@ -128,104 +127,4 @@ const Waveform = forwardRef(function Waveform(
       bars.forEach((v, i) => {
         const x = i * (bw + gap);
         const h = Math.max(3, v * H * 0.92);
-        const played = i / n <= progress;
-        ctx.fillStyle = played ? `hsl(var(--${accent}-deep))` : "hsl(var(--charcoal) / 0.16)";
-        const y = (H - h) / 2;
-
-        ctx.beginPath();
-        // Safe rounded rectangle fallback for mobile browsers
-        if (typeof ctx.roundRect === "function") {
-          try {
-            ctx.roundRect(x, y, bw, h, bw / 2);
-          } catch (e) {
-            ctx.rect(x, y, bw, h);
-          }
-        } else {
-          ctx.rect(x, y, bw, h);
-        }
-        ctx.fill();
-      });
-
-      // Playhead indicator
-      const px = progress * W;
-      ctx.fillStyle = "hsl(var(--charcoal))";
-      ctx.fillRect(px - 1, 0, 2, H);
-
-      // Marker annotations
-      markers.forEach((m) => {
-        if (!duration) return;
-        const x = (m.time / duration) * W;
-        ctx.fillStyle = "hsl(var(--butter-deep))";
-        ctx.beginPath();
-        ctx.arc(x, 10, 5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = "hsl(var(--charcoal))";
-        ctx.beginPath();
-        ctx.arc(x, 10, 2, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = "hsl(var(--butter-deep) / 0.6)";
-        ctx.beginPath();
-        ctx.moveTo(x, 14);
-        ctx.lineTo(x, H);
-        ctx.stroke();
-      });
-    } catch (err) {
-      console.warn("Canvas render safeguard caught error:", err);
-    }
-  }, [bars, progress, markers, duration, accent]);
-
-  const toggle = () => {
-    const a = audioRef.current;
-    if (!a) return;
-    if (a.paused) {
-      a.play().then(() => setPlaying(true)).catch(() => {});
-    } else {
-      a.pause();
-      setPlaying(false);
-    }
-  };
-
-  const replay = () => {
-    const a = audioRef.current;
-    if (!a) return;
-    a.currentTime = 0;
-    a.play().then(() => setPlaying(true)).catch(() => {});
-  };
-
-  const handleCanvasClick = (e) => {
-    try {
-      const canvas = canvasRef.current;
-      const a = audioRef.current;
-      if (!canvas || !a || !duration) return;
-      const rect = canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const t = (x / rect.width) * duration;
-      const near = markers.find((m) => Math.abs(m.time - t) < 0.6);
-      if (near && onSelectMarker) {
-        onSelectMarker(near);
-        return;
-      }
-      if (onAddMarker) onAddMarker(t);
-    } catch (e) {}
-  };
-
-  return (
-    <div className="w-full">
-      <canvas
-        ref={canvasRef}
-        onClick={handleCanvasClick}
-        className="w-full h-24 sm:h-28 cursor-pointer rounded-xl"
-        aria-label="Audio waveform — click to add a note"
-      />
-      <audio
-        ref={audioRef}
-        src={audioUrl}
-        onLoadedMetadata={(e) => {
-          const d = e.target.duration || 0;
-          setDuration(d);
-          if (onDurationChange) onDurationChange(d);
-        }}
-        onTimeUpdate={(e) => {
-          const a = e.target;
-          setCurrent(a.currentTime);
-          setProgress(a.duration ? a.currentTime / a.duration : 0);
+        const played
