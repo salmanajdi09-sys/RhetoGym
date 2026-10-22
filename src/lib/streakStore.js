@@ -25,7 +25,6 @@ export function getStreakData() {
     } else if (data.lastDate === yesterday) {
       return { count: data.count, lastDate: data.lastDate, completedToday: false };
     } else {
-      // Streak broken
       return { count: 0, lastDate: data.lastDate, completedToday: false };
     }
   } catch (e) {
@@ -37,18 +36,18 @@ export function recordPracticeSession() {
   const current = getStreakData();
   const today = getTodayStr();
 
-  if (current.completedToday) {
-    return { count: current.count, newlyUpdated: false };
+  let newCount = current.count;
+  if (!current.completedToday) {
+    newCount = current.count + 1;
   }
 
-  const newCount = current.count + 1;
   const newData = { count: newCount, lastDate: today };
 
   try {
     localStorage.setItem(STREAK_KEY, JSON.stringify(newData));
   } catch (e) {}
 
-  return { count: newCount, newlyUpdated: true };
+  return { count: newCount, newlyUpdated: !current.completedToday };
 }
 
 export function getSavedBadgePos() {
