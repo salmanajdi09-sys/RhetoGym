@@ -190,4 +190,116 @@ export default function ThinkFast() {
     );
   }
 
-  if (phase
+  if (phase === "warmup") {
+    return (
+      <div className="relative min-h-[70vh] flex flex-col items-center justify-center">
+        <FloatingShapes density="light" />
+        <div className="relative mx-auto max-w-2xl px-5 sm:px-8 py-10 w-full">
+          <WarmUpBox onContinue={startRound} accent={ACCENT} />
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === "prepare") {
+    return (
+      <div className="relative min-h-[70vh] flex flex-col">
+        <FloatingShapes density="light" />
+        <div className="relative mx-auto max-w-2xl px-5 sm:px-8 py-10 w-full">
+          <span className="font-mono text-xs uppercase tracking-widest text-coral-deep block text-center">{t("prep.getReady")}</span>
+          <Countdown from={count} accent={ACCENT} onDone={() => setCount(0)} />
+          <div className="mt-4 rounded-2xl border border-border/60 bg-card/70 p-5 text-center">
+            <p className="text-charcoal/70 text-balance">{txt}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === "record") {
+    if (rec.status === "denied") {
+      return (
+        <div className="relative mx-auto max-w-lg px-5 sm:px-8 py-16 text-center">
+          <AlertCircle className="w-10 h-10 text-coral-deep mx-auto mb-4" />
+          <h2 className="font-display text-3xl text-charcoal">{t("record.micDenied")}</h2>
+          <p className="text-charcoal/60 mt-3">{t("record.micDeniedBody")}</p>
+          <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
+            <button onClick={async () => { await rec.start(); }} className="px-6 py-3 rounded-full bg-charcoal text-cream font-medium">{t("record.tryAgain")}</button>
+            <button onClick={() => { setMetrics(computeMetrics("", SPEAK)); setPhase("review"); }} className="px-6 py-3 rounded-full bg-card border border-border font-medium">{t("record.continuePractice")}</button>
+          </div>
+        </div>
+      );
+    }
+    const remaining = Math.max(0, SPEAK - elapsed);
+    const pct = Math.min(elapsed / SPEAK, 1);
+    return (
+      <div className="relative min-h-[80vh] flex flex-col">
+        <FloatingShapes density="light" />
+        <div className="relative mx-auto max-w-2xl px-5 sm:px-8 py-8 w-full flex-1 flex flex-col">
+          <div className="text-center">
+            <span className="font-mono text-xs uppercase tracking-widest text-coral-deep">{t("drills.thinkfast.name")}</span>
+            {prompt?.type && <span className="block mt-1 font-mono text-[10px] uppercase tracking-widest text-charcoal/40">{t(`challenge.${prompt.type}`)}</span>}
+            <p className="mt-2 text-charcoal/70 text-balance">{txt}</p>
+          </div>
+          <div className="flex-1 flex flex-col items-center justify-center py-8">
+            <div className="font-display text-[5rem] sm:text-[7rem] font-semibold leading-none tabular-nums" style={{ color: `hsl(var(--${ACCENT}-deep))` }}>
+              {formatTime(remaining)}
+            </div>
+            <div className="mt-3 inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-charcoal/5">
+              <span className={`w-2.5 h-2.5 rounded-full ${bandColor} ${rec.status === "recording" ? "animate-pulse-soft" : ""}`} />
+              <span className="font-mono text-xs uppercase tracking-widest text-charcoal/60">{liveWpm > 0 ? `~${liveWpm} WPM` : "…"}</span>
+            </div>
+            {prompt?.type === "reverse" && (
+              <div className={`mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-full ${half ? "bg-coral/20 border border-coral-deep/40" : "bg-charcoal/5"}`}>
+                <span className={`w-2 h-2 rounded-full ${half ? "bg-coral-deep animate-pulse-soft" : "bg-charcoal/40"}`} />
+                <span className="font-mono text-xs uppercase tracking-widest text-charcoal/70">{half ? t("thinkfast.switchNow") : t("thinkfast.sideOne")}</span>
+              </div>
+            )}
+          </div>
+          <div className="h-2.5 rounded-full bg-charcoal/8 overflow-hidden">
+            <motion.div className="h-full rounded-full" style={{ width: `${pct * 100}%`, background: `hsl(var(--${ACCENT}-deep))` }} />
+          </div>
+          <div className="mt-6 flex flex-col items-center gap-4">
+            <div className="inline-flex items-center gap-3 px-6 py-3 rounded-full bg-coral/20 border border-coral-deep/30">
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-coral-deep opacity-60" />
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-coral-deep" />
+              </span>
+              <span className="font-mono text-sm font-bold tracking-widest text-coral-deep">{t("record.recording")}</span>
+            </div>
+            <div className="flex flex-col sm:flex-row items-center gap-3">
+              <button onClick={finish} className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-charcoal text-cream font-medium hover:scale-105 transition-transform">
+                <Square className="w-4 h-4" /> {t("record.endReview")}
+              </button>
+              <button onClick={retry} className="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-card border border-border text-charcoal/70 font-medium hover:text-charcoal">
+                <RotateCcw className="w-4 h-4" /> {t("record.restart")}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative mx-auto max-w-3xl px-5 sm:px-8 py-10">
+      {showReceipt && round ? (
+        <PracticeReceipt round={round} onClose={() => setShowReceipt(false)} />
+      ) : (
+        <ReviewPanel 
+          key={round?.id || prompt?.id || "review"} 
+          record={round || { category: prompt?.cats?.[0], difficulty: prompt?.level, promptId: prompt?.id, challengeType: prompt?.type, targetDuration: SPEAK }} 
+          audioUrl={rec.audioUrl} 
+          transcript={rec.transcript} 
+          metrics={metrics} 
+          accent={ACCENT} 
+          motion={txt} 
+          position="SPEAK" 
+          drillName="Think Fast" 
+          onRetry={retry} 
+          showSelfCheck={false} 
+        />
+      )}
+    </div>
+  );
+}
