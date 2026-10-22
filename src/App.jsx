@@ -19,7 +19,7 @@ import About from '@/pages/About';
 import Feedback from '@/pages/Feedback';
 import Contact from '@/pages/Contact';
 import SpeakingTips from '@/pages/SpeakingTips';
-// Add page imports here
+import FloatingStreakBadge from '@/components/FloatingStreakBadge'; // 1. Import the streak badge
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -46,27 +46,28 @@ const AuthenticatedApp = () => {
 
   // Render the main app
   return (
-    <Routes>
-      <Route element={<Layout />}>
-        <Route path="/" element={<Landing />} />
-        <Route path="/train" element={<Drills />} />
-        <Route path="/drills/rebuttal-blitz" element={<RebuttalBlitz />} />
-        <Route path="/drills/think-fast" element={<ThinkFast />} />
-        <Route path="/soapbox" element={<Soapbox />} />
-        <Route path="/review" element={<Review />} />
-        <Route path="/about" element={<About />} />
-        <Route path="/feedback" element={<Feedback />} />
-        <Route path="/contact" element={<Contact />} />
-        <Route path="/tips" element={<SpeakingTips />} />
-      </Route>
-      <Route path="*" element={<PageNotFound />} />
-    </Routes>
+    <>
+      <FloatingStreakBadge /> {/* 2. Render badge so it floats over the entire app */}
+      <Routes>
+        <Route element={<Layout />}>
+          <Route path="/" element={<Landing />} />
+          <Route path="/train" element={<Drills />} />
+          <Route path="/drills/rebuttal-blitz" element={<RebuttalBlitz />} />
+          <Route path="/drills/think-fast" element={<ThinkFast />} />
+          <Route path="/soapbox" element={<Soapbox />} />
+          <Route path="/review" element={<Review />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/feedback" element={<Feedback />} />
+          <Route path="/contact" element={<Contact />} />
+          <Route path="/tips" element={<SpeakingTips />} />
+        </Route>
+        <Route path="*" element={<PageNotFound />} />
+      </Routes>
+    </>
   );
 };
 
-
 function App() {
-
   return (
     <LanguageProvider>
       <AuthProvider>
