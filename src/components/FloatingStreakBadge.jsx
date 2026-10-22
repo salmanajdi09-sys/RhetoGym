@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Dumbbell, Flame } from "lucide-react";
+import { Sparkles, Flame } from "lucide-react";
 import { getStreakData, getSavedBadgePos, saveBadgePos } from "@/lib/streakStore";
 
 export default function FloatingStreakBadge() {
@@ -34,17 +34,25 @@ export default function FloatingStreakBadge() {
       whileTap={{ scale: 0.95 }}
       className="fixed z-50 top-6 right-6 cursor-grab active:cursor-grabbing select-none"
     >
-      <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-charcoal/90 text-cream backdrop-blur-md shadow-xl border border-cream/10 text-xs font-mono font-medium tracking-wide transition-colors">
+      <div className="flex items-center gap-2.5 px-4 py-2 rounded-full bg-white/80 backdrop-blur-md border border-purple-200/60 shadow-lg shadow-purple-500/5 text-xs font-mono font-medium text-slate-800 transition-all">
         {streak.completedToday ? (
-          <Flame className="w-4 h-4 text-coral animate-pulse" />
+          <Flame className="w-4 h-4 text-purple-600 animate-pulse" />
         ) : (
-          <Dumbbell className="w-4 h-4 text-cream/70" />
+          <Sparkles className="w-4 h-4 text-purple-500" />
         )}
-        <span>
-          {count > 0 ? `${count} DAY${count > 1 ? "S" : ""} IN GYM` : "0 REPS YET"}
+        
+        <span className="tracking-wide">
+          {count > 0 ? (
+            <>
+              <span className="font-bold text-purple-600">{count}</span> DAY STREAK
+            </>
+          ) : (
+            <span className="text-slate-600">Ready for Round 1</span>
+          )}
         </span>
+
         {streak.completedToday && (
-          <span className="w-2 h-2 rounded-full bg-sage-deep" />
+          <span className="w-2 h-2 rounded-full bg-emerald-500" />
         )}
       </div>
     </motion.div>
