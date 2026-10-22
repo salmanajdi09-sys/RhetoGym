@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Sparkles, Flame } from "lucide-react";
+import { Dumbbell, Flame } from "lucide-react";
 import { getStreakData, getSavedBadgePos, saveBadgePos } from "@/lib/streakStore";
 
 export default function FloatingStreakBadge() {
@@ -12,6 +12,13 @@ export default function FloatingStreakBadge() {
     setStreak(getStreakData());
     setPos(getSavedBadgePos());
     setMounted(true);
+
+    // Listen for custom streak update event when a round finishes
+    const handleStreakUpdate = () => {
+      setStreak(getStreakData());
+    };
+    window.addEventListener("rhetogym_streak_updated", handleStreakUpdate);
+    return () => window.removeEventListener("rhetogym_streak_updated", handleStreakUpdate);
   }, []);
 
   if (!mounted) return null;
@@ -30,29 +37,29 @@ export default function FloatingStreakBadge() {
       }}
       initial={{ scale: 0.8, opacity: 0 }}
       animate={{ scale: 1, opacity: 1, x: pos.x, y: pos.y }}
-      whileHover={{ scale: 1.05 }}
-      whileTap={{ scale: 0.95 }}
+      whileHover={{ scale: 1.08 }}
+      whileTap={{ scale: 0.92 }}
       className="fixed z-50 top-6 right-6 cursor-grab active:cursor-grabbing select-none"
     >
-      <div className="flex items-center gap-2.5 px-4 py-2 rounded-full bg-white/80 backdrop-blur-md border border-purple-200/60 shadow-lg shadow-purple-500/5 text-xs font-mono font-medium text-slate-800 transition-all">
-        {streak.completedToday ? (
-          <Flame className="w-4 h-4 text-purple-600 animate-pulse" />
+      {/* Capsule shape with rich periwinkle/purple border and glowing shadow */}
+      <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-full bg-white/95 backdrop-blur-xl border-2 border-indigo-500/80 shadow-xl shadow-indigo-500/20 text-slate-900 transition-all">
+        {streak.completedToday || count > 0 ? (
+          <Flame className="w-5 h-5 text-indigo-600 fill-indigo-500/20 animate-pulse" />
         ) : (
-          <Sparkles className="w-4 h-4 text-purple-500" />
+          <Dumbbell className="w-5 h-5 text-indigo-600" />
         )}
-        
-        <span className="tracking-wide">
+
+        <div className="flex items-center gap-1.5 font-mono text-xs font-bold tracking-wider">
           {count > 0 ? (
-            <>
-              <span className="font-bold text-purple-600">{count}</span> DAY STREAK
-            </>
+            <span className="text-indigo-600 text-sm">{count}</span>
           ) : (
-            <span className="text-slate-600">Ready for Round 1</span>
+            <span className="text-slate-400">0</span>
           )}
-        </span>
+          <span className="text-slate-700 uppercase">STREAK</span>
+        </div>
 
         {streak.completedToday && (
-          <span className="w-2 h-2 rounded-full bg-emerald-500" />
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-emerald-200" />
         )}
       </div>
     </motion.div>
