@@ -52,13 +52,6 @@ export default function Soapbox() {
     }, 1000);
     return () => clearInterval(timerRef.current);
   }, [phase]);
-  const handleFinishRound = () => {
-  // 1. Trigger the streak update & popup message immediately!
-  completeRoundAndTriggerStreak();
-
-  // 2. Your existing round completion logic (e.g., navigating to /review or saving notes)
-  // ... rest of your code ...
-};
 
   const start = async () => {
     setElapsed(0);
@@ -69,6 +62,9 @@ export default function Soapbox() {
 
   const finish = () => {
     if (timerRef.current) clearInterval(timerRef.current);
+    // 1. Save streak progress & trigger floating speech bubble popup
+    completeRoundAndTriggerStreak();
+    // 2. Stop audio recording
     rec.stop();
   };
 
@@ -145,129 +141,4 @@ export default function Soapbox() {
           <div className="flex items-center gap-3 flex-wrap">
             <span className="font-mono text-xs uppercase tracking-widest text-lavender-deep">02 · {t("drills.soapbox.name")}</span>
             {prompt?.level && <LevelBadge level={prompt.level} />}
-            {prompt?.structure && <span className="text-sm text-charcoal/60">{t(`challenge.${prompt.structure}`)}</span>}
-          </div>
-          <h1 className="font-display text-4xl sm:text-5xl text-charcoal mt-3 text-balance">{t("drills.soapbox.desc")}</h1>
-
-          <div className="mt-8 rounded-3xl border border-border/60 p-7 sm:p-9" style={{ background: `hsl(var(--${ACCENT}) / 0.32)` }}>
-            <span className="font-mono text-xs uppercase tracking-widest text-charcoal/40">{t("common.yourMotion")}</span>
-            <p className="font-display text-2xl sm:text-3xl text-charcoal mt-2 text-balance">{txt}</p>
-          </div>
-
-          <div className="mt-8 flex flex-col sm:flex-row gap-3 items-center justify-center">
-            <button onClick={() => setPhase("warmup")} className="group inline-flex items-center gap-2 px-8 py-4 rounded-full bg-charcoal text-cream font-semibold text-lg hover:scale-[1.03] transition-transform">
-              {t("common.ready")} <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-            </button>
-            <button onClick={shuffle} className="inline-flex items-center gap-2 px-5 py-3 rounded-full text-charcoal/60 hover:text-charcoal text-sm">
-              <RotateCcw className="w-4 h-4" /> {t("common.shuffle")}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (phase === "warmup") {
-    return (
-      <div className="relative min-h-[70vh] flex flex-col items-center justify-center">
-        <FloatingShapes density="light" />
-        <div className="relative mx-auto max-w-2xl px-5 sm:px-8 py-10 w-full">
-          <WarmUpBox onContinue={start} accent={ACCENT} />
-        </div>
-      </div>
-    );
-  }
-
-  if (phase === "record") {
-    if (rec.status === "denied") {
-      return (
-        <div className="relative mx-auto max-w-lg px-5 sm:px-8 py-16 text-center">
-          <AlertCircle className="w-10 h-10 text-coral-deep mx-auto mb-4" />
-          <h2 className="font-display text-3xl text-charcoal">{t("record.micDenied")}</h2>
-          <p className="text-charcoal/60 mt-3">{t("record.micDeniedBody")}</p>
-          <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
-            <button onClick={async () => { await rec.start(); }} className="px-6 py-3 rounded-full bg-charcoal text-cream font-medium">{t("record.tryAgain")}</button>
-            <button onClick={() => { setMetrics(computeMetrics("", TOTAL)); setPhase("review"); }} className="px-6 py-3 rounded-full bg-card border border-border font-medium">{t("record.continuePractice")}</button>
-          </div>
-        </div>
-      );
-    }
-    const remaining = Math.max(0, TOTAL - elapsed);
-    const pct = Math.min(elapsed / TOTAL, 1);
-    return (
-      <div className="relative min-h-[80vh] flex flex-col">
-        <FloatingShapes density="light" />
-        <div className="relative mx-auto max-w-2xl px-5 sm:px-8 py-8 w-full flex-1 flex flex-col">
-          <div className="text-center">
-            <span className="font-mono text-xs uppercase tracking-widest text-lavender-deep">{t("drills.soapbox.name")}</span>
-            <p className="mt-2 text-charcoal/70 text-balance">{txt}</p>
-          </div>
-
-          <div className="mt-6"><AudienceViz energy={energy} restless={restless} /></div>
-
-          <div className="flex-1 flex flex-col items-center justify-center py-6">
-            <div className="font-display text-[4.5rem] sm:text-[6rem] font-semibold leading-none tabular-nums text-charcoal">{formatTime(remaining)}</div>
-            <div className="mt-3 inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-charcoal/5">
-              <span className={`w-2.5 h-2.5 rounded-full ${bandColor} ${rec.status === "recording" ? "animate-pulse-soft" : ""}`} />
-              <span className="font-mono text-xs uppercase tracking-widest text-charcoal/60">{liveWpm > 0 ? `~${liveWpm} WPM` : "…"}</span>
-            </div>
-          </div>
-
-          <div className="h-2.5 rounded-full bg-charcoal/8 overflow-hidden">
-            <motion.div className="h-full rounded-full" style={{ width: `${pct * 100}%`, background: `hsl(var(--${ACCENT}-deep))` }} />
-          </div>
-
-          <div className="mt-6 flex flex-col items-center gap-4">
-            <div className="inline-flex items-center gap-3 px-6 py-3 rounded-full bg-coral/20 border border-coral-deep/30">
-              <span className="relative flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-coral-deep opacity-60" />
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-coral-deep" />
-              </span>
-              <span className="font-mono text-sm font-bold tracking-widest text-coral-deep">{t("record.recording")}</span>
-            </div>
-            <div className="flex flex-col sm:flex-row items-center gap-3">
-              <button onClick={finish} className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-charcoal text-cream font-medium hover:scale-105 transition-transform">
-                <Square className="w-4 h-4" /> {t("record.endReview")}
-              </button>
-              <button onClick={retry} className="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-card border border-border text-charcoal/70 font-medium hover:text-charcoal">
-                <RotateCcw className="w-4 h-4" /> {t("record.restart")}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Phase 1: Show Receipt first after recording
-  if (phase === "receipt" && round) {
-    return (
-      <div className="relative mx-auto max-w-3xl px-5 sm:px-8 py-10">
-        <PracticeReceipt round={round} onClose={() => setPhase("review")} />
-      </div>
-    );
-  }
-
-  // Phase 2: Show Full Review Panel when clicking "Continue to Review"
-  if (phase === "review") {
-    return (
-      <div className="relative mx-auto max-w-3xl px-5 sm:px-8 py-10">
-        <ReviewPanel 
-          key={round?.id || prompt?.id || "review"} 
-          record={round || { category: prompt?.cats?.[0], difficulty: prompt?.level, promptId: prompt?.id, challengeType: prompt?.structure, targetDuration: TOTAL }} 
-          audioUrl={rec.audioUrl} 
-          transcript={rec.transcript} 
-          metrics={metrics} 
-          accent={ACCENT} 
-          motion={txt} 
-          position="DELIVER" 
-          drillName="Soapbox" 
-          onRetry={retry} 
-          extra={<AudienceViz energy={metrics?.hasTranscript ? 0.7 : 0.4} restless={0} />}
-        />
-      </div>
-    );
-  }
-
-  return null;
-}
+            {prompt?.structure && <span className="
