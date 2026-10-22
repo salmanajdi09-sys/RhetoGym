@@ -8,6 +8,7 @@ import ReviewPanel from "@/components/ReviewPanel";
 import WarmUpBox from "@/components/WarmUpBox";
 import PracticeReceipt from "@/components/PracticeReceipt";
 import TopicSelect from "@/components/TopicSelect";
+import { completeRoundAndTriggerStreak } from "@/lib/streakStore";
 import LevelBadge from "@/components/LevelBadge";
 import { useRecorder } from "@/hooks/useRecorder";
 import { soapboxPrompts, randomPrompt, promptText } from "@/data/prompts";
@@ -51,6 +52,13 @@ export default function Soapbox() {
     }, 1000);
     return () => clearInterval(timerRef.current);
   }, [phase]);
+  const handleFinishRound = () => {
+  // 1. Trigger the streak update & popup message immediately!
+  completeRoundAndTriggerStreak();
+
+  // 2. Your existing round completion logic (e.g., navigating to /review or saving notes)
+  // ... rest of your code ...
+};
 
   const start = async () => {
     setElapsed(0);
