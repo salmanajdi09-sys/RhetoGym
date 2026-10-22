@@ -1,8 +1,21 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Dumbbell, Flame, X } from "lucide-react";
-import { getStreakData, getSavedBadgePos, saveBadgePos, recordPracticeSession } from "@/lib/streakStore";
-import { getRandomResilienceMessage } from "@/data/resilienceMessages";
+import { getStreakData, getSavedBadgePos, saveBadgePos } from "@/lib/streakStore";
+
+// Embedded Resilience Messages with diverse structures & grounded tone
+const resilienceMessages = [
+  "Rhetoric is muscle memory—and you just put in the work.",
+  "Showing up on low-energy days is where the real progress happens.",
+  "You're building something solid here, one round at a time.",
+  "Sharp reps today. You're right on track.",
+  "The stage gets less intimidating every single time you hit record.",
+  "Clearer thoughts, smoother delivery. The practice is working."
+];
+
+function getRandomResilienceMessage() {
+  return resilienceMessages[Math.floor(Math.random() * resilienceMessages.length)];
+}
 
 export default function FloatingStreakBadge() {
   const [streak, setStreak] = useState({ count: 0, completedToday: false });
@@ -16,7 +29,7 @@ export default function FloatingStreakBadge() {
     setMounted(true);
 
     const handleStreakUpdate = (event) => {
-      // 1. Refresh streak count
+      // 1. Refresh streak data
       const updated = getStreakData();
       setStreak(updated);
 
