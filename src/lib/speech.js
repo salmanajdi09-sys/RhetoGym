@@ -1,73 +1,57 @@
-// Lightweight speech metrics derived from a transcript + recording duration.
+import { useRecorder } from "./useRecorder";
+import { computeMetrics, paceBand, formatTime } from "./speech";
+import { useState, useEffect } from "react";
 
-const FILLERS = ["um", "uh", "er", "ah", "like", "basically", "actually", "literally", "so", "well", "right", "hmm", "ya know", "you know"];
+export function SpeechPracticeComponent() {
+  const { status, transcript, start, stop, reset } = useRecorder("en");
+  const [duration, setDuration] = useState(0);
 
-export function tokenize(transcript) {
-  if (!transcript) return [];
-  return transcript
-    .toLowerCase()
-    .replace(/[^\w\s']/g, " ")
-    .split(/\s+/)
-    .map((w) => w.trim())
-    .filter(Boolean);
-}
-
-export function countFillers(transcript) {
-  const tokens = tokenize(transcript);
-  const counts = {};
-  let total = 0;
-  // phrase-level fillers first
-  const lower = transcript.toLowerCase();
-  for (const phrase of ["you know", "ya know"]) {
-    const re = new RegExp(`\\b${phrase}\\b`, "g");
-    const m = (lower.match(re) || []).length;
-    if (m) { counts[phrase] = m; total += m; }
-  }
-  for (const t of tokens) {
-    if (["you", "ya", "know"].includes(t)) continue; // handled as phrase
-    if (FILLERS.includes(t)) {
-      counts[t] = (counts[t] || 0) + 1;
-      total += 1;
+  // Track recording duration while status is "recording"
+  useEffect(() => {
+    let timer;
+    if (status === "recording") {
+      const startTime = Date.now() - duration * 1000;
+      timer = setInterval(() => {
+        setDuration((Date.now() - startTime) / 1000);
+      }, 500);
+    } else if (status === "idle") {
+      setDuration(0);
     }
-  }
-  const list = Object.entries(counts)
-    .sort((a, b) => b[1] - a[1])
-    .map(([word, n]) => ({ word, count: n }));
-  return { total, list };
-}
+    return () => clearInterval(timer);
+  }, [status]);
 
-export function computeMetrics(transcript, durationSec) {
-  const tokens = tokenize(transcript);
-  const wordCount = tokens.length;
-  const minutes = Math.max(durationSec / 60, 1 / 60);
-  const wpm = Math.round(wordCount / minutes);
-  const { total: fillerCount, list: fillerList } = countFillers(transcript);
-  return {
-    wordCount,
-    wpm,
-    fillerCount,
-    fillerList,
-    durationSec,
-    hasTranscript: wordCount > 0,
-  };
-}
+  // Compute metrics using your speech.js utilities!
+  const metrics = computeMetrics(transcript, duration);
+  const currentPaceBand = paceBand(metrics.wpm, status === "stopped");
 
-// Pace band for the live indicator.
-// green: comfortable (120-165), yellow: outside but alive, red: ended
-export function paceBand(wpm, ended) {
-  if (ended) return "red";
-  if (wpm === 0) return "yellow";
-  if (wpm >= 120 && wpm <= 165) return "green";
-  return "yellow";
-}
+  return (
+    <div className="p-6 max-w-xl mx-auto">
+      <div className="text-2xl font-bold mb-4">Time: {formatTime(duration)}</div>
+      
+      {/* Live Pace Indicator */}
+      <div className={`p-2 mb-4 text-white rounded ${currentPaceBand === 'green' ? 'bg-green-500' : 'bg-yellow-500'}`}>
+        Current Pace: {metrics.wpm} WPM ({currentPaceBand})
+      </div>
 
-export function formatTime(sec) {
-  const s = Math.max(0, Math.floor(sec));
-  const m = Math.floor(s / 60);
-  const r = s % 60;
-  return `${String(m).padStart(2, "0")}:${String(r).padStart(2, "0")}`;
-}
+      {/* Live Transcript Display */}
+      <div className="border p-4 rounded min-h-[100px] mb-4 bg-gray-50">
+        <p className="text-gray-700">{transcript || "Start speaking to see your live transcript..."}</p>
+      </div>
 
-export function randomPrompt(list) {
-  return list[Math.floor(Math.random() * list.length)];
+      {/* Filler Word Stats */}
+      <div className="mb-4">
+        <span className="font-semibold">Filler words detected: {metrics.fillerCount}</span>
+      </div>
+
+      {/* Controls */}
+      <div className="flex gap-2">
+        {status !== "recording" ? (
+          <button onClick={start} className="bg-blue-600 text-white px-4 py-2 rounded">Start Recording</button>
+        ) : (
+          <button onClick={stop} className="bg-red-600 text-white px-4 py-2 rounded">Stop</button>
+        )}
+        <button onClick={reset} className="bg-gray-300 px-4 py-2 rounded">Reset</button>
+      </div>
+    </div>
+  );
 }
