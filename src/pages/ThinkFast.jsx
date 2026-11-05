@@ -9,7 +9,7 @@ import WarmUpBox from "@/components/WarmUpBox";
 import PracticeReceipt from "@/components/PracticeReceipt";
 import TopicSelect from "@/components/TopicSelect";
 import LevelBadge from "@/components/LevelBadge";
-import { completeRoundAndTriggerStreak } from "@/lib/streakStore";
+import { completeRoundAndTriggerCounter } from "@/lib/streakStore";
 import { useRecorder } from "@/hooks/useRecorder";
 import { thinkfastPrompts, randomPrompt, promptText, thinkfastTypes } from "@/data/prompts";
 import { computeMetrics, paceBand, formatTime } from "@/lib/speech";
@@ -81,7 +81,7 @@ export default function ThinkFast() {
 
   const finish = () => {
     if (timerRef.current) clearInterval(timerRef.current);
-    completeRoundAndTriggerStreak();
+    completeRoundAndTriggerCounter({ lang });
     rec.stop();
   };
 
