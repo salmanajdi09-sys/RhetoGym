@@ -1,60 +1,33 @@
-const STREAK_KEY = "rhetogym_streak_data";
+const ROUND_KEY = "rhetogym_total_rounds";
 const POS_KEY = "rhetogym_badge_pos";
 
-function getTodayStr() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-function getYesterdayStr() {
-  const d = new Date();
-  d.setDate(d.getDate() - 1);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-export function getStreakData() {
+export function getRoundData() {
   try {
-    const raw = localStorage.getItem(STREAK_KEY);
-    if (!raw) return { count: 0, lastDate: null, completedToday: false };
-    const data = JSON.parse(raw);
-    const today = getTodayStr();
-    const yesterday = getYesterdayStr();
-
-    if (data.lastDate === today) {
-      return { count: data.count, lastDate: data.lastDate, completedToday: true };
-    } else if (data.lastDate === yesterday) {
-      return { count: data.count, lastDate: data.lastDate, completedToday: false };
-    } else {
-      return { count: 0, lastDate: data.lastDate, completedToday: false };
-    }
+    const raw = localStorage.getItem(ROUND_KEY);
+    if (!raw) return { count: 0 };
+    return JSON.parse(raw);
   } catch (e) {
-    return { count: 0, lastDate: null, completedToday: false };
+    return { count: 0 };
   }
 }
 
-export function recordPracticeSession() {
-  const current = getStreakData();
-  const today = getTodayStr();
-
-  let newCount = current.count;
-  if (!current.completedToday) {
-    newCount = current.count + 1;
-  }
-
-  const newData = { count: newCount, lastDate: today };
+export function recordCompletedRound() {
+  const current = getRoundData();
+  const newCount = current.count + 1;
+  const newData = { count: newCount };
 
   try {
-    localStorage.setItem(STREAK_KEY, JSON.stringify(newData));
+    localStorage.setItem(ROUND_KEY, JSON.stringify(newData));
   } catch (e) {}
 
-  return { count: newCount, newlyUpdated: !current.completedToday };
+  return { count: newCount };
 }
 
-export function completeRoundAndTriggerStreak(customMessage) {
-  const result = recordPracticeSession();
+export function completeRoundAndTriggerCounter(customMessage) {
+  const result = recordCompletedRound();
 
   window.dispatchEvent(
-    new CustomEvent("rhetogym_streak_updated", {
+    new CustomEvent("rhetogym_round_updated", {
       detail: { message: customMessage }
     })
   );
