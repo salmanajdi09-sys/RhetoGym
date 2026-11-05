@@ -23,12 +23,12 @@ export function recordCompletedRound() {
   return { count: newCount };
 }
 
-export function completeRoundAndTriggerCounter(customMessage) {
+export function completeRoundAndTriggerCounter(options = {}) {
   const result = recordCompletedRound();
 
   window.dispatchEvent(
     new CustomEvent("rhetogym_round_updated", {
-      detail: { message: customMessage }
+      detail: typeof options === "string" ? { message: options } : options
     })
   );
 
