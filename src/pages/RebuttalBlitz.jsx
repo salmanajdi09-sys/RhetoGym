@@ -62,7 +62,7 @@ export default function RebuttalBlitz() {
       setElapsed(e);
       if (e >= TOTAL) finishRecording();
     }, 1000);
-    return () => clearInterval(timerRef.current);
+    return () => clearTimeout(timerRef.current);
   }, [phase]);
 
   const startRound = () => {
@@ -106,4 +106,90 @@ export default function RebuttalBlitz() {
           durationSec: dur,
           category: prompt?.cats?.[0] || "general",
           difficulty: prompt?.level || "any",
-          prompt
+          promptId: prompt?.id || "prompt",
+          challengeType: prompt?.structure || prompt?.type || "rebuttal",
+          targetDuration: TOTAL,
+        }));
+        setShowReceipt(true);
+        setPhase("review");
+      }, 200);
+
+      return () => clearTimeout(timer);
+    }
+  }, [rec.status]);
+
+  const retry = () => {
+    rec.reset();
+    shuffle();
+    setElapsed(0);
+    setMetrics(null);
+    setRound(null);
+    setShowReceipt(false);
+    setPhase("prompt");
+  };
+
+  const liveWpm = elapsed > 0 ? Math.round((rec.transcript.trim().split(/\s+/).filter(Boolean).length / elapsed) * 60) : 0;
+  const band = paceBand(liveWpm, elapsed >= TOTAL);
+  const activePhase = getPhase(elapsed);
+  const bandColor = { green: "bg-sage", yellow: "bg-butter", red: "bg-coral" }[band];
+  const bandLabel = { green: t("record.pace.green"), yellow: t("record.pace.yellow"), red: t("record.pace.red") }[band];
+
+  if (phase === "topic") {
+    return (
+      <div className="relative">
+        <FloatingShapes density="light" />
+        <div className="relative">
+          <div className="mx-auto max-w-3xl px-5 sm:px-8 pt-8">
+            <button onClick={() => navigate("/train")} className="text-sm text-charcoal/50 hover:text-charcoal inline-flex items-center gap-1">
+              <ArrowLeft className="w-4 h-4" /> {t("nav.train")}
+            </button>
+          </div>
+          <TopicSelect onSelect={selectTopic} accent={ACCENT} />
+        </div>
+      </div>
+    );
+  }
+
+  const p = prompt ? promptText(prompt, lang) : { motion: "", position: "", angles: [] };
+
+  if (phase === "prompt") {
+    return (
+      <div className="relative">
+        <FloatingShapes density="light" />
+        <div className="relative mx-auto max-w-3xl px-5 sm:px-8 py-12">
+          <button onClick={() => setPhase("topic")} className="text-sm text-charcoal/50 hover:text-charcoal mb-8 inline-flex items-center gap-1">
+            <ArrowLeft className="w-4 h-4" /> {t("topic.title")}
+          </button>
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="font-mono text-xs uppercase tracking-widest text-sky-deep">
+              01 - {t("drills.rebuttal.name")}
+            </span>
+            {prompt?.level && <LevelBadge level={prompt.level} />}
+            {prompt?.structure && <span className="text-sm text-charcoal/60">{t(`challenge.${prompt.structure}`)}</span>}
+          </div>
+
+          <div className="mt-6 rounded-3xl border border-border/60 bg-card/70 p-6 sm:p-9">
+            <span className="font-mono text-xs uppercase tracking-widest text-charcoal/40">{t("common.yourMotion")}</span>
+            <h1 className="font-display text-3xl sm:text-4xl text-charcoal mt-2 text-balance">{p.motion}</h1>
+          </div>
+
+          <div className="mt-5 rounded-3xl bg-sky/20 border border-sky-deep/20 p-6 sm:p-8">
+            <span className="font-mono text-xs uppercase tracking-widest text-charcoal/40">{t("common.yourPosition")}</span>
+            <p className="font-display text-4xl sm:text-5xl text-sky-deep mt-1">{p.position}</p>
+          </div>
+
+          <div className="mt-5 rounded-3xl border border-border/60 bg-card/70 p-6 sm:p-8">
+            <span className="font-mono text-xs uppercase tracking-widest text-charcoal/40">{t("common.yourAngles")}</span>
+            <p className="text-sm text-charcoal/50 mt-1 mb-4">{t("common.anglesHint")}</p>
+            <div className="space-y-3">
+              {p.angles.map((a, i) => (
+                <div key={i} className="flex items-center gap-4">
+                  <span className="font-mono text-sm text-charcoal/40">0{i + 1}</span>
+                  <span className="font-display text-xl text-charcoal">{a}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-8 flex flex-col sm:flex-row gap-3 items-center justify-center">
+            <button onClick={() => setPhase("warmup")} className="group inline-flex items-center gap-2 px-
