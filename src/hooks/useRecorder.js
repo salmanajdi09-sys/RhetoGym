@@ -23,11 +23,14 @@ export function useRecorder(lang = "en") {
   const [speechSupported, setSpeechSupported] = useState(false);
 
   const mediaRecorderRef = useRef(null);
+  const recognitionRef = useRef(null);
   const chunksRef = useRef([]);
   const streamRef = useRef(null);
 
   useEffect(() => {
     setMicSupported(!!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia));
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    setSpeechSupported(!!SpeechRecognition);
   }, []);
 
   const start = useCallback(async () => {
@@ -40,6 +43,7 @@ export function useRecorder(lang = "en") {
     }
 
     try {
+      // 1. Start Audio Recording (for playback / backend use)
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
           echoCancellation: true,
@@ -79,14 +83,47 @@ export function useRecorder(lang = "en") {
 
       mr.start(1000);
       mediaRecorderRef.current = mr;
+
+      // 2. Start Live Speech Recognition
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        const recognition = new SpeechRecognition();
+        recognition.lang = lang;
+        recognition.continuous = true;
+        recognition.interimResults = true;
+
+        recognition.onresult = (event) => {
+          let interimTranscript = "";
+          let finalTranscript = "";
+
+          for (let i = event.resultIndex; i < event.results.length; ++i) {
+            if (event.results[i].isFinal) {
+              finalTranscript += event.results[i][0].transcript;
+            } else {
+              interimTranscript += event.results[i][0].transcript;
+            }
+          }
+
+          setTranscript((prev) => prev + (finalTranscript || interimTranscript));
+        };
+
+        recognition.onerror = (err) => {
+          console.error("Speech recognition error:", err);
+        };
+
+        recognition.start();
+        recognitionRef.current = recognition;
+      }
+
       setStatus("recording");
     } catch (err) {
       console.error("Microphone access error:", err);
       setStatus("denied");
     }
-  }, []);
+  }, [lang]);
 
   const stop = useCallback(() => {
+    // Stop MediaRecorder
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
       try {
         mediaRecorderRef.current.stop();
@@ -95,15 +132,24 @@ export function useRecorder(lang = "en") {
           streamRef.current.getTracks().forEach((t) => t.stop());
           streamRef.current = null;
         }
-        setStatus("stopped");
       }
-    } else {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((t) => t.stop());
-        streamRef.current = null;
-      }
-      setStatus("stopped");
     }
+
+    // Stop Speech Recognition
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (e) {
+        console.error("Failed to stop recognition:", e);
+      }
+      recognitionRef.current = null;
+    }
+
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+    setStatus("stopped");
   }, []);
 
   const reset = useCallback(() => {
@@ -118,6 +164,9 @@ export function useRecorder(lang = "en") {
       if (audioUrl) URL.revokeObjectURL(audioUrl);
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((t) => t.stop());
+      }
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
       }
     };
   }, [audioUrl]);
