@@ -1,15 +1,13 @@
-import react from '@vitejs/plugin-react'
-import { defineConfig } from 'vite'
-import { fileURLToPath, URL } from 'node:url'
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import App from '@/App.jsx'
+import '@/index.css'
+import { injectSpeedInsights } from '@vercel/speed-insights'
 
-// https://vite.dev/config/
-export default defineConfig({
-  plugins: [
-    react(),
-  ],
-  resolve: {
-    alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url))
-    }
-  }
-});
+injectSpeedInsights(npm i @vercel/speed-insights)
+
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
+)
