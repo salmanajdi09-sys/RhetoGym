@@ -6,6 +6,7 @@ import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import { LanguageProvider } from '@/lib/i18n';
 import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import ScrollToTop from './components/ScrollToTop';
 import Layout from '@/components/Layout';
@@ -76,6 +77,7 @@ function App() {
         </QueryClientProvider>
       </AuthProvider>
       <Analytics />
+      <SpeedInsights />
     </LanguageProvider>
   )
 }
