@@ -26,12 +26,64 @@ export function useRecorder(lang = "en") {
   const recognitionRef = useRef(null);
   const chunksRef = useRef([]);
   const streamRef = useRef(null);
+  const isRecordingRef = useRef(false);
 
   useEffect(() => {
     setMicSupported(!!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia));
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     setSpeechSupported(!!SpeechRecognition);
   }, []);
+
+  const startSpeechRecognition = useCallback(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.lang = lang;
+      recognition.continuous = true;
+      recognition.interimResults = true;
+
+      recognition.onresult = (event) => {
+        let interimText = "";
+        let finalText = "";
+
+        // Rebuild transcript cleanly from all results to avoid duplicates
+        for (let i = 0; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            finalText += event.results[i][0].transcript + " ";
+          } else {
+            interimText += event.results[i][0].transcript;
+          }
+        }
+
+        setTranscript((finalText + interimText).trim());
+      };
+
+      recognition.onerror = (err) => {
+        // Ignore 'no-speech' errors which happen often during pauses
+        if (err.error !== "no-speech") {
+          console.warn("Speech recognition warning/error:", err.error);
+        }
+      };
+
+      // Auto-restart if browser stops recognition due to silence while still recording
+      recognition.onend = () => {
+        if (isRecordingRef.current) {
+          try {
+            recognition.start();
+          } catch (e) {
+            // Already started or unsupported state
+          }
+        }
+      };
+
+      recognition.start();
+      recognitionRef.current = recognition;
+    } catch (e) {
+      console.error("Failed to start speech recognition:", e);
+    }
+  }, [lang]);
 
   const start = useCallback(async () => {
     setTranscript("");
@@ -43,7 +95,9 @@ export function useRecorder(lang = "en") {
     }
 
     try {
-      // 1. Start Audio Recording (for playback / backend use)
+      isRecordingRef.current = true;
+
+      // 1. Start Audio Recording (for playback / session storage)
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
           echoCancellation: true,
@@ -85,44 +139,19 @@ export function useRecorder(lang = "en") {
       mediaRecorderRef.current = mr;
 
       // 2. Start Live Speech Recognition
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        const recognition = new SpeechRecognition();
-        recognition.lang = lang;
-        recognition.continuous = true;
-        recognition.interimResults = true;
-
-        recognition.onresult = (event) => {
-          let interimTranscript = "";
-          let finalTranscript = "";
-
-          for (let i = event.resultIndex; i < event.results.length; ++i) {
-            if (event.results[i].isFinal) {
-              finalTranscript += event.results[i][0].transcript;
-            } else {
-              interimTranscript += event.results[i][0].transcript;
-            }
-          }
-
-          setTranscript((prev) => prev + (finalTranscript || interimTranscript));
-        };
-
-        recognition.onerror = (err) => {
-          console.error("Speech recognition error:", err);
-        };
-
-        recognition.start();
-        recognitionRef.current = recognition;
-      }
+      startSpeechRecognition();
 
       setStatus("recording");
     } catch (err) {
       console.error("Microphone access error:", err);
+      isRecordingRef.current = false;
       setStatus("denied");
     }
-  }, [lang]);
+  }, [startSpeechRecognition]);
 
   const stop = useCallback(() => {
+    isRecordingRef.current = false;
+
     // Stop MediaRecorder
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
       try {
@@ -138,6 +167,7 @@ export function useRecorder(lang = "en") {
     // Stop Speech Recognition
     if (recognitionRef.current) {
       try {
+        recognitionRef.current.onend = null; // Prevent auto-restart trigger on stop
         recognitionRef.current.stop();
       } catch (e) {
         console.error("Failed to stop recognition:", e);
@@ -153,6 +183,7 @@ export function useRecorder(lang = "en") {
   }, []);
 
   const reset = useCallback(() => {
+    isRecordingRef.current = false;
     if (audioUrl) URL.revokeObjectURL(audioUrl);
     setAudioUrl(null);
     setTranscript("");
@@ -161,11 +192,13 @@ export function useRecorder(lang = "en") {
 
   useEffect(() => {
     return () => {
+      isRecordingRef.current = false;
       if (audioUrl) URL.revokeObjectURL(audioUrl);
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((t) => t.stop());
       }
       if (recognitionRef.current) {
+        recognitionRef.current.onend = null;
         recognitionRef.current.stop();
       }
     };
