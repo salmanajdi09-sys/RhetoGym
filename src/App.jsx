@@ -19,12 +19,11 @@ import About from '@/pages/About';
 import Feedback from '@/pages/Feedback';
 import Contact from '@/pages/Contact';
 import SpeakingTips from '@/pages/SpeakingTips';
-import FloatingStreakBadge from '@/components/FloatingStreakBadge'; // 1. Import the streak badge
+import FloatingStreakBadge from '@/components/FloatingStreakBadge';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
 
-  // Show loading spinner while checking app public settings or auth
   if (isLoadingPublicSettings || isLoadingAuth) {
     return (
       <div className="fixed inset-0 flex items-center justify-center">
@@ -33,21 +32,18 @@ const AuthenticatedApp = () => {
     );
   }
 
-  // Handle authentication errors
   if (authError) {
     if (authError.type === 'user_not_registered') {
       return <UserNotRegisteredError />;
     } else if (authError.type === 'auth_required') {
-      // Redirect to login automatically
       navigateToLogin();
       return null;
     }
   }
 
-  // Render the main app
   return (
     <>
-      <FloatingStreakBadge /> {/* 2. Render badge so it floats over the entire app */}
+      <FloatingStreakBadge />
       <Routes>
         <Route element={<Layout />}>
           <Route path="/" element={<Landing />} />
@@ -79,7 +75,7 @@ function App() {
           <Toaster />
         </QueryClientProvider>
       </AuthProvider>
-      <Analytics/>
+      <Analytics />
     </LanguageProvider>
   )
 }
