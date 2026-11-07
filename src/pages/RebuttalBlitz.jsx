@@ -62,7 +62,7 @@ export default function RebuttalBlitz() {
       setElapsed(e);
       if (e >= TOTAL) finishRecording();
     }, 1000);
-    return () => clearTimeout(timerRef.current);
+    return () => clearInterval(timerRef.current);
   }, [phase]);
 
   const startRound = () => {
@@ -192,4 +192,119 @@ export default function RebuttalBlitz() {
           </div>
 
           <div className="mt-8 flex flex-col sm:flex-row gap-3 items-center justify-center">
-            <button onClick={() => setPhase("warmup")} className="group inline-flex items-center gap-2 px-
+            <button onClick={() => setPhase("warmup")} className="group inline-flex items-center gap-2 px-6 py-3 rounded-full bg-card border border-border/80 text-charcoal text-sm font-medium hover:border-sky/50 transition-all">
+              {t("common.warmup")}
+            </button>
+            <button onClick={startRound} className="group inline-flex items-center gap-2 px-6 py-3 rounded-full bg-sky text-white text-sm font-medium hover:bg-sky-deep transition-all">
+              {t("common.startRound")} <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === "warmup") {
+    return (
+      <WarmUpBox
+        accent={ACCENT}
+        onBack={() => setPhase("prompt")}
+        onStart={startRound}
+      />
+    );
+  }
+
+  if (phase === "prepare") {
+    return (
+      <div className="relative min-h-[80vh] flex flex-col items-center justify-center px-5">
+        <FloatingShapes density="light" />
+        <div className="relative text-center max-w-lg mx-auto">
+          <span className="font-mono text-xs uppercase tracking-widest text-sky-deep block mb-3">
+            {t("record.getReady")}
+          </span>
+          <h2 className="font-display text-2xl text-charcoal mb-8">{p.motion}</h2>
+          <Countdown value={count} size="lg" />
+          <p className="text-sm text-charcoal/50 mt-8">{t("record.prepHint")}</p>
+          <button
+            onClick={() => {
+              if (timerRef.current) clearTimeout(timerRef.current);
+              beginRecording();
+            }}
+            className="mt-6 text-xs text-charcoal/40 hover:text-charcoal underline underline-offset-4"
+          >
+            {t("record.skipPrep")}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === "record") {
+    return (
+      <div className="relative min-h-[85vh] flex flex-col px-5 sm:px-8 py-8 max-w-4xl mx-auto justify-between">
+        <FloatingShapes density="light" />
+        <div>
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-coral animate-pulse" />
+              <span className="font-mono text-xs uppercase tracking-widest text-coral font-medium">
+                {t("record.recording")}
+              </span>
+            </div>
+            <div className="font-mono text-sm text-charcoal/60">
+              {formatTime(elapsed)} / {formatTime(TOTAL)}
+            </div>
+          </div>
+          <PhaseBar elapsed={elapsed} total={TOTAL} accent={ACCENT} />
+          <div className="mt-8 rounded-3xl border border-border/60 bg-card/70 p-6 sm:p-8">
+            <span className="font-mono text-xs uppercase tracking-widest text-charcoal/40">{t("common.yourMotion")}</span>
+            <h2 className="font-display text-2xl sm:text-3xl text-charcoal mt-1 text-balance">{p.motion}</h2>
+            <div className="mt-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-sky/20 text-sky-deep text-sm font-medium">
+              {p.position}
+            </div>
+          </div>
+        </div>
+
+        <div className="my-8 rounded-3xl border border-border/60 bg-card/60 p-6 sm:p-8 min-h-[160px] max-h-[220px] overflow-y-auto">
+          <span className="font-mono text-xs uppercase tracking-widest text-charcoal/40 block mb-2">{t("record.transcriptLive")}</span>
+          <p className="text-charcoal/80 text-lg leading-relaxed font-sans">
+            {rec.transcript || <span className="text-charcoal/30 italic">{t("record.startSpeaking")}</span>}
+          </p>
+        </div>
+
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div className="flex items-center gap-3">
+            <div className={`px-3 py-1.5 rounded-full text-xs font-mono font-medium text-charcoal flex items-center gap-1.5 ${bandColor}`}>
+              <span className="w-2 h-2 rounded-full bg-charcoal/60" />
+              {liveWpm} WPM ({bandLabel})
+            </div>
+          </div>
+          <button
+            onClick={finishRecording}
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-charcoal text-white text-sm font-medium hover:bg-charcoal/90 transition-all shadow-lg"
+          >
+            <Square className="w-4 h-4 fill-current" /> {t("record.finish")}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === "review") {
+    return (
+      <div className="relative min-h-[85vh] px-5 sm:px-8 py-10 max-w-4xl mx-auto">
+        <FloatingShapes density="light" />
+        <ReviewPanel
+          round={round}
+          metrics={metrics}
+          accent={ACCENT}
+          onRetry={retry}
+          showReceipt={showReceipt}
+          onCloseReceipt={() => setShowReceipt(false)}
+        />
+      </div>
+    );
+  }
+
+  return null;
+}
