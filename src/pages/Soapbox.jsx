@@ -153,4 +153,98 @@ export default function Soapbox() {
               {t("common.ready")} <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </button>
             <button onClick={shuffle} className="inline-flex items-center gap-2 px-5 py-3 rounded-full text-charcoal/60 hover:text-charcoal text-sm">
-              <RotateCcw className="w-4 h-4" /> {t("
+              <RotateCcw className="w-4 h-4" /> {t("common.shuffle")}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === "warmup") {
+    return (
+      <WarmUpBox
+        accent={ACCENT}
+        onBack={() => setPhase("prompt")}
+        onStart={start}
+      />
+    );
+  }
+
+  if (phase === "record") {
+    return (
+      <div className="relative min-h-[85vh] flex flex-col px-5 sm:px-8 py-8 max-w-4xl mx-auto justify-between">
+        <FloatingShapes density="light" />
+        <div>
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-coral animate-pulse" />
+              <span className="font-mono text-xs uppercase tracking-widest text-coral font-medium">
+                {t("record.recording")}
+              </span>
+            </div>
+            <div className="font-mono text-sm text-charcoal/60">
+              {formatTime(elapsed)} / {formatTime(TOTAL)}
+            </div>
+          </div>
+          <div className="mt-8 rounded-3xl border border-border/60 bg-card/70 p-6 sm:p-8">
+            <span className="font-mono text-xs uppercase tracking-widest text-charcoal/40">{t("common.yourMotion")}</span>
+            <h2 className="font-display text-2xl sm:text-3xl text-charcoal mt-1 text-balance">{txt}</h2>
+          </div>
+        </div>
+
+        <div className="my-8 rounded-3xl border border-border/60 bg-card/60 p-6 sm:p-8 min-h-[160px] max-h-[220px] overflow-y-auto">
+          <span className="font-mono text-xs uppercase tracking-widest text-charcoal/40 block mb-2">{t("record.transcriptLive")}</span>
+          <p className="text-charcoal/80 text-lg leading-relaxed font-sans">
+            {rec.transcript || <span className="text-charcoal/30 italic">{t("record.startSpeaking")}</span>}
+          </p>
+        </div>
+
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div className="flex items-center gap-3">
+            <div className={`px-3 py-1.5 rounded-full text-xs font-mono font-medium text-charcoal flex items-center gap-1.5 ${bandColor}`}>
+              <span className="w-2 h-2 rounded-full bg-charcoal/60" />
+              {liveWpm} WPM
+            </div>
+          </div>
+          <button
+            onClick={finish}
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-charcoal text-white text-sm font-medium hover:bg-charcoal/90 transition-all shadow-lg"
+          >
+            <Square className="w-4 h-4 fill-current" /> {t("record.finish")}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === "receipt") {
+    return (
+      <div className="relative min-h-[85vh] px-5 sm:px-8 py-10 max-w-2xl mx-auto flex flex-col items-center justify-center">
+        <FloatingShapes density="light" />
+        <PracticeReceipt
+          round={round}
+          metrics={metrics}
+          accent={ACCENT}
+          onViewReview={() => setPhase("review")}
+        />
+      </div>
+    );
+  }
+
+  if (phase === "review") {
+    return (
+      <div className="relative min-h-[85vh] px-5 sm:px-8 py-10 max-w-4xl mx-auto">
+        <FloatingShapes density="light" />
+        <ReviewPanel
+          round={round}
+          metrics={metrics}
+          accent={ACCENT}
+          onRetry={retry}
+        />
+      </div>
+    );
+  }
+
+  return null;
+}
