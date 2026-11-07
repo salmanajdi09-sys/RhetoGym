@@ -333,10 +333,23 @@ export default function ReviewPanel({
 }
 
 function MetricCard({ label, value, sub, accent }) {
+  const accentBgMap = {
+    sky: "bg-sky/15",
+    lavender: "bg-lavender/15",
+    butter: "bg-butter/15",
+    sage: "bg-sage/15",
+  };
+  const accentColorMap = {
+    sky: "hsl(var(--sky-deep))",
+    lavender: "hsl(var(--lavender-deep))",
+    butter: "hsl(var(--butter-deep))",
+    sage: "hsl(var(--sage-deep))",
+  };
+
   return (
-    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className={`rounded-2xl border border-border/60 bg-${accent}/15 p-4`}>
+    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className={`rounded-2xl border border-border/60 ${accentBgMap[accent] || "bg-sky/15"} p-4`}>
       <span className="font-mono text-xs uppercase tracking-widest text-charcoal/50">{label}</span>
-      <div className="font-display text-3xl text-charcoal mt-1" style={{ color: `hsl(var(--${accent}-deep))` }}>{value}</div>
+      <div className="font-display text-3xl text-charcoal mt-1" style={{ color: accentColorMap[accent] || "inherit" }}>{value}</div>
       <span className="text-xs text-charcoal/50">{sub}</span>
     </motion.div>
   );
