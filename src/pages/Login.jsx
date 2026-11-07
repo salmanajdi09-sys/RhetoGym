@@ -1,6 +1,5 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
-import { base44 } from "@/api/base44Client";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,30 +9,23 @@ import GoogleIcon from "@/components/GoogleIcon";
 import { safeReturnTo } from "@/lib/authReturnTo";
 
 export default function Login() {
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  // Post-login destination (e.g. the MCP OAuth consent page sends users here
-  // with returnTo so the grant flow can resume). Same-origin paths only.
   const returnTo = safeReturnTo();
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
-    setError("");
     setLoading(true);
-    try {
-      await base44.auth.loginViaEmailPassword(email, password);
-      window.location.href = returnTo;
-    } catch (err) {
-      setError(err.message || "Invalid email or password");
-    } finally {
+    setTimeout(() => {
       setLoading(false);
-    }
+      navigate(returnTo === "/" ? "/train" : returnTo);
+    }, 500);
   };
 
   const handleGoogle = () => {
-    base44.auth.loginWithProvider("google", returnTo);
+    navigate("/train");
   };
 
   return (
@@ -71,12 +63,6 @@ export default function Login() {
         </div>
       </div>
 
-      {error && (
-        <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
-          {error}
-        </div>
-      )}
-
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="email">Email</Label>
@@ -98,9 +84,6 @@ export default function Login() {
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <Label htmlFor="password">Password</Label>
-            <Link to="/forgot-password" className="text-xs text-primary hover:underline">
-              Forgot password?
-            </Link>
           </div>
           <div className="relative">
             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
