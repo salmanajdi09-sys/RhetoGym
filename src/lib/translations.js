@@ -31,7 +31,7 @@ export const translations = {
     "tips.delivery.title": "Core Delivery",
     "tips.delivery.intro": "Good speaking is not only about what you say. Pace, pauses, and clarity matter too.",
     "tips.delivery.cards": [
-      { "title": "Find Your Pace", "rule": "Aim for roughly 120 to 165 words per minute.", "practice": "Check your WPM after a round. If you are consistently above 165, try slowing down slightly in your next round." },
+      { "title": "Find Your Pace", "rule": "Aim for roughly 130 to 150 words per minute.", "practice": "Check your WPM after a round. If you are consistently above 160, try slowing down slightly in your next round." },
       { "title": "Let Silence Work", "rule": "When you need a moment to think, pause instead of filling the space with \"um,\" \"uh,\" or \"like.\"", "practice": "Try a deliberate one-second pause the next time you lose your train of thought. Then continue.", "note": "A short pause can give you time to think while keeping your delivery clear." },
       { "title": "Make Your Words Clear", "rule": "Slow down slightly on important words and finish your consonants clearly.", "practice": "Before a round, say a few sentences while paying attention to the sounds at the ends of words. Then focus on clarity during your round." }
     ],
@@ -282,6 +282,9 @@ export const translations = {
     "warmup.skip": "Skip",
     "warmup.another": "Another one",
     "warmup.startRound": "Start Round",
+    "warmup.continue": "Continue to Warm-Up",
+    "warmup.readHint": "Read it through first. The timer starts when you're ready.",
+    "warmup.roundOf": "Round",
     "warmup.secondLeft": "second left",
     "warmup.secondsLeft": "seconds left",
     "warmup.doneMessages": ["Nice!", "Done!", "Good one!", "That's a warm-up!"],
@@ -318,7 +321,8 @@ export const translations = {
     "receipt.date": "Date",
     "receipt.reflection": "Your reflection",
     "receipt.practicedWith": "Practiced with RhetoGym",
-    "receipt.save": "Save",
+    "receipt.save": "Save image",
+    "receipt.continue": "Continue to Review",
     "receipt.share": "Share",
     "receipt.close": "Close",
     "receipt.none": "none",
@@ -331,6 +335,17 @@ export const translations = {
     "common.yourPosition": "Your position",
     "common.yourAngles": "Your 3 angles",
     "common.anglesHint": "Inspiration to start thinking, not a finished argument.",
+
+    "duration.eyebrow": "Speaking length",
+    "duration.title": "How long do you want to speak?",
+    "duration.required": "Pick a length for this round.",
+    "duration.recommended": "Recommended",
+
+    "calendar.title": "Keep your speaking practice going!",
+    "calendar.body": "Plan your next speaking session and make a little time for yourself to improve.",
+    "calendar.cta": "Add to Google Calendar",
+    "calendar.eventTitle": "RhetoGym – Speaking Practice",
+    "calendar.eventDetails": "A short speaking practice session with RhetoGym. Pick one idea, say it out loud, and see what changes.",
   },
 
   fr: {
@@ -615,6 +630,9 @@ export const translations = {
     "warmup.skip": "Passer",
     "warmup.another": "Un autre",
     "warmup.startRound": "Lancer le tour",
+    "warmup.continue": "Lancer l'échauffement",
+    "warmup.readHint": "Lisez d'abord tranquillement. Le chrono démarre quand vous êtes prêt.",
+    "warmup.roundOf": "Tour",
     "warmup.secondLeft": "seconde restante",
     "warmup.secondsLeft": "secondes restantes",
     "warmup.doneMessages": ["Bien !", "Fait !", "Pas mal !", "Ça chauffe !"],
@@ -651,7 +669,8 @@ export const translations = {
     "receipt.date": "Date",
     "receipt.reflection": "Votre réflexion",
     "receipt.practicedWith": "Pratiqué avec RhetoGym",
-    "receipt.save": "Enregistrer",
+    "receipt.save": "Enregistrer l'image",
+    "receipt.continue": "Voir le bilan",
     "receipt.share": "Partager",
     "receipt.close": "Fermer",
     "receipt.none": "aucun",
@@ -664,5 +683,16 @@ export const translations = {
     "common.yourPosition": "Votre position",
     "common.yourAngles": "Vos 3 angles",
     "common.anglesHint": "De l'inspiration pour commencer à réfléchir, pas un argument fini.",
+
+    "duration.eyebrow": "Durée de parole",
+    "duration.title": "Combien de temps voulez-vous parler ?",
+    "duration.required": "Choisissez une durée pour cette manche.",
+    "duration.recommended": "Conseillé",
+
+    "calendar.title": "Gardez le rythme !",
+    "calendar.body": "Planifiez votre prochaine session et accordez-vous un moment pour progresser.",
+    "calendar.cta": "Ajouter à Google Agenda",
+    "calendar.eventTitle": "RhetoGym – Session d'oral",
+    "calendar.eventDetails": "Une courte session d'oral avec RhetoGym. Prenez une idée, dites-la à voix haute et regardez ce qui change.",
   },
 };
