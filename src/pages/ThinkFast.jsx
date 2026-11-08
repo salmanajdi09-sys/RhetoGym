@@ -8,8 +8,8 @@ import ReviewPanel from "@/components/ReviewPanel";
 import WarmUpBox from "@/components/WarmUpBox";
 import PracticeReceipt from "@/components/PracticeReceipt";
 import TopicSelect from "@/components/TopicSelect";
+import DurationSelect from "@/components/DurationSelect";
 import LevelBadge from "@/components/LevelBadge";
-import { completeRoundAndTriggerCounter } from "@/lib/streakStore";
 import { useRecorder } from "@/hooks/useRecorder";
 import { thinkfastPrompts, randomPrompt, promptText, thinkfastTypes } from "@/data/prompts";
 import { computeMetrics, paceBand, formatTime } from "@/lib/speech";
@@ -17,7 +17,8 @@ import { saveSession } from "@/lib/sessionStore";
 import { useLanguage, useT } from "@/lib/i18n";
 
 const PREP = 8;
-const SPEAK = 45;
+const DEFAULT_DURATION = 45;
+const RECOMMENDED_DURATION = 40;
 const ACCENT = "coral";
 
 export default function ThinkFast() {
@@ -32,10 +33,16 @@ export default function ThinkFast() {
   const [elapsed, setElapsed] = useState(0);
   const [metrics, setMetrics] = useState(null);
   const [round, setRound] = useState(null);
+  const [duration, setDuration] = useState(null);
   const [showReceipt, setShowReceipt] = useState(false);
   const timerRef = useRef(null);
+  const elapsedRef = useRef(0);
+  const handledRef = useRef(false);
 
   const rec = useRecorder(lang);
+
+  // Only the speaking length is chosen per round; the prep countdown stays fixed.
+  const SPEAK = duration || DEFAULT_DURATION;
 
   const selectTopic = (cat, lvl) => {
     setCategory(cat);
@@ -43,7 +50,6 @@ export default function ThinkFast() {
     setPrompt(randomPrompt(thinkfastPrompts, lang, cat, lvl));
     setPhase("prompt");
   };
-
   const shuffle = () => setPrompt(randomPrompt(thinkfastPrompts, lang, category, level));
 
   useEffect(() => {
@@ -54,26 +60,28 @@ export default function ThinkFast() {
   }, [phase, count]);
 
   useEffect(() => {
-    if (phase !== "record") return;
+    if (phase !== "record" || rec.status !== "recording") return;
     const start = Date.now();
     timerRef.current = setInterval(() => {
-      const e = Math.floor((Date.now() - start) / 1000);
+      const e = (Date.now() - start) / 1000;
+      elapsedRef.current = e;
       setElapsed(e);
-      if (e >= SPEAK) {
-        finish();
-      }
-    }, 1000);
+      if (e >= SPEAK) finish();
+    }, 100);
     return () => clearInterval(timerRef.current);
-  }, [phase]);
+  }, [phase, rec.status]);
 
   const startRound = () => {
     setCount(PREP);
+    elapsedRef.current = 0;
+    handledRef.current = false;
     setElapsed(0);
     setMetrics(null);
     setPhase("prepare");
   };
 
   const beginRecording = async () => {
+    elapsedRef.current = 0;
     setElapsed(0);
     await rec.start();
     setPhase("record");
@@ -81,46 +89,46 @@ export default function ThinkFast() {
 
   const finish = () => {
     if (timerRef.current) clearInterval(timerRef.current);
-    completeRoundAndTriggerCounter({ lang });
     rec.stop();
   };
 
   useEffect(() => {
-    if (rec.status === "stopped" && phase === "record") {
-      const timer = setTimeout(() => {
-        const dur = Math.min(SPEAK, Math.max(elapsed, 1));
-        const mt = computeMetrics(rec.transcript, dur);
-        setMetrics(mt);
-        const txt = promptText(prompt, lang);
-        setRound(saveSession({
-          audioUrl: rec.audioUrl,
-          transcript: rec.transcript,
-          metrics: mt,
-          accent: ACCENT,
-          motion: txt,
-          position: "SPEAK",
-          drillName: "Think Fast",
-          durationSec: dur,
-          category: prompt?.cats?.[0] || "general",
-          difficulty: prompt?.level || "any",
-          promptId: prompt?.id || "prompt",
-          challengeType: prompt?.structure || prompt?.type || "thinkfast",
-          targetDuration: SPEAK,
-        }));
-        setShowReceipt(true);
-        setPhase("review");
-      }, 200);
-
-      return () => clearTimeout(timer);
+    if (rec.status === "stopped" && phase === "record" && !handledRef.current) {
+      handledRef.current = true;
+      const dur = Math.min(SPEAK, Math.max(elapsedRef.current || elapsed, 1));
+      const mt = computeMetrics(rec.transcript, dur);
+      setMetrics(mt);
+      const txt = promptText(prompt, lang);
+      setRound(saveSession({
+        audioUrl: rec.audioUrl,
+        transcript: rec.transcript,
+        metrics: mt,
+        accent: ACCENT,
+        motion: txt,
+        position: "SPEAK",
+        drillName: "Think Fast",
+        durationSec: dur,
+        category: prompt.cats[0], difficulty: prompt.level, promptId: prompt.id, challengeType: prompt.structure || prompt.type, targetDuration: SPEAK,
+      }));
+      setShowReceipt(true);
+      setPhase("review");
     }
   }, [rec.status]);
+
+  const dismissReceipt = () => {
+    setShowReceipt(false);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   const retry = () => {
     rec.reset();
     shuffle();
+    elapsedRef.current = 0;
+    handledRef.current = false;
     setElapsed(0);
     setMetrics(null);
     setRound(null);
+    setDuration(null);
     setShowReceipt(false);
     setPhase("prompt");
   };
@@ -158,7 +166,7 @@ export default function ThinkFast() {
             <ArrowLeft className="w-4 h-4" /> {t("topic.title")}
           </button>
           <div className="flex items-center gap-3 flex-wrap">
-            <span className="font-mono text-xs uppercase tracking-widest text-coral-deep">03 - {t("drills.thinkfast.name")}</span>
+            <span className="font-mono text-xs uppercase tracking-widest text-coral-deep">03 · {t("drills.thinkfast.name")}</span>
             {prompt?.level && <LevelBadge level={prompt.level} />}
           </div>
           <h1 className="font-display text-4xl sm:text-5xl text-charcoal mt-3 text-balance">{t("drills.thinkfast.desc")}</h1>
@@ -177,8 +185,12 @@ export default function ThinkFast() {
             <p className="font-display text-2xl sm:text-3xl text-charcoal mt-2 text-balance">{txt}</p>
           </div>
 
+          <div className="mt-6 rounded-3xl border border-border/60 bg-card/70 p-5 sm:p-6">
+            <DurationSelect value={duration} onChange={setDuration} accent={ACCENT} recommended={RECOMMENDED_DURATION} />
+          </div>
+
           <div className="mt-8 flex flex-col sm:flex-row gap-3 items-center justify-center">
-            <button onClick={() => setPhase("warmup")} className="group inline-flex items-center gap-2 px-8 py-4 rounded-full bg-charcoal text-cream font-semibold text-lg hover:scale-[1.03] transition-transform">
+            <button onClick={() => setPhase("warmup")} disabled={!duration} className="group inline-flex items-center gap-2 px-8 py-4 rounded-full bg-charcoal text-cream font-semibold text-lg hover:scale-[1.03] transition-transform disabled:opacity-40 disabled:hover:scale-100 disabled:cursor-not-allowed">
               {t("common.ready")} <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </button>
             <button onClick={shuffle} className="inline-flex items-center gap-2 px-5 py-3 rounded-full text-charcoal/60 hover:text-charcoal text-sm">
@@ -283,23 +295,8 @@ export default function ThinkFast() {
 
   return (
     <div className="relative mx-auto max-w-3xl px-5 sm:px-8 py-10">
-      {showReceipt && round ? (
-        <PracticeReceipt round={round} onClose={() => setShowReceipt(false)} />
-      ) : (
-        <ReviewPanel 
-          key={round?.id || prompt?.id || "review"} 
-          record={round || { category: prompt?.cats?.[0], difficulty: prompt?.level, promptId: prompt?.id, challengeType: prompt?.type, targetDuration: SPEAK }} 
-          audioUrl={rec.audioUrl} 
-          transcript={rec.transcript} 
-          metrics={metrics} 
-          accent={ACCENT} 
-          motion={txt} 
-          position="SPEAK" 
-          drillName="Think Fast" 
-          onRetry={retry} 
-          showSelfCheck={false} 
-        />
-      )}
+      <ReviewPanel key={round?.id || prompt?.id} record={round || { category: prompt?.cats[0], difficulty: prompt?.level, promptId: prompt?.id, challengeType: prompt?.type, targetDuration: SPEAK }} audioUrl={rec.audioUrl} transcript={rec.transcript} metrics={metrics} accent={ACCENT} motion={txt} position="SPEAK" drillName="Think Fast" onRetry={retry} showSelfCheck={false} />
+      {showReceipt && round && <PracticeReceipt round={round} onClose={dismissReceipt} onContinue={dismissReceipt} />}
     </div>
   );
 }
