@@ -1,4 +1,4 @@
-import { useRecorder } from "./useRecorder";
+import { useRecorder } from "@/hooks/useRecorder";
 import { computeMetrics, paceBand, formatTime } from "./speech";
 import { useState, useEffect } from "react";
 
