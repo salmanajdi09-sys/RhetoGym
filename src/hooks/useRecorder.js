@@ -1,208 +1,363 @@
 import { useRef, useState, useCallback, useEffect } from "react";
 
-function getSupportedMimeType() {
-  if (typeof MediaRecorder === "undefined") return "";
-  const types = [
-    "audio/mp4",
-    "audio/webm;codecs=opus",
-    "audio/webm",
-    "audio/aac",
-    "audio/ogg",
-  ];
-  for (const type of types) {
-    if (MediaRecorder.isTypeSupported(type)) return type;
+// MediaRecorder + Web Speech API (live transcript) with graceful degradation.
+// `lang` is a BCP-47 locale hint for speech recognition ("en" | "fr").
+//
+// Cross-browser notes:
+// - Safari (iOS/macOS) records MP4/AAC and rejects audio/webm, so the mime type
+//   is negotiated instead of hardcoded.
+// - Mobile browsers suspend the mic when a recorder is left half-started, so a
+//   single session is strictly guarded (no double getUserMedia calls).
+// - Chunks are flushed on a timeslice *and* on stop, so a long round never ends
+//   with an empty or truncated blob.
+
+const MIME_CANDIDATES = [
+  "audio/webm;codecs=opus",
+  "audio/webm",
+  "audio/ogg;codecs=opus",
+  "audio/mp4",
+  "audio/mp4;codecs=mp4a.40.2",
+  "audio/aac",
+];
+
+function pickMimeType() {
+  if (typeof window === "undefined" || typeof window.MediaRecorder === "undefined") return "";
+  for (const type of MIME_CANDIDATES) {
+    try {
+      if (window.MediaRecorder.isTypeSupported(type)) return type;
+    } catch {
+      /* isTypeSupported can throw on unusual builds */
+    }
   }
   return "";
 }
 
 export function useRecorder(lang = "en") {
-  const [status, setStatus] = useState("idle");
+  const [status, setStatus] = useState("idle"); // idle | recording | stopped | denied
   const [audioUrl, setAudioUrl] = useState(null);
   const [transcript, setTranscript] = useState("");
   const [micSupported, setMicSupported] = useState(true);
-  const [speechSupported, setSpeechSupported] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(true);
 
   const mediaRecorderRef = useRef(null);
-  const recognitionRef = useRef(null);
   const chunksRef = useRef([]);
   const streamRef = useRef(null);
-  const isRecordingRef = useRef(false);
+  const recognitionRef = useRef(null);
+  const finalTextRef = useRef("");
+  const langRef = useRef(lang);
+  const urlRef = useRef(null);
+  const startingRef = useRef(false); // permission request in flight
+  const stopRequestedRef = useRef(false); // stop() called while starting
+  const activeRef = useRef(false); // a live recording session exists
+  const unmountedRef = useRef(false);
 
   useEffect(() => {
-    setMicSupported(!!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia));
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    setSpeechSupported(!!SpeechRecognition);
-  }, []);
-
-  const startSpeechRecognition = useCallback(() => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) return;
-
-    try {
-      const recognition = new SpeechRecognition();
-      recognition.lang = lang;
-      recognition.continuous = true;
-      recognition.interimResults = true;
-
-      recognition.onresult = (event) => {
-        let interimText = "";
-        let finalText = "";
-
-        // Rebuild transcript cleanly from all results to avoid duplicates
-        for (let i = 0; i < event.results.length; ++i) {
-          if (event.results[i].isFinal) {
-            finalText += event.results[i][0].transcript + " ";
-          } else {
-            interimText += event.results[i][0].transcript;
-          }
-        }
-
-        setTranscript((finalText + interimText).trim());
-      };
-
-      recognition.onerror = (err) => {
-        // Ignore 'no-speech' errors which happen often during pauses
-        if (err.error !== "no-speech") {
-          console.warn("Speech recognition warning/error:", err.error);
-        }
-      };
-
-      // Auto-restart if browser stops recognition due to silence while still recording
-      recognition.onend = () => {
-        if (isRecordingRef.current) {
-          try {
-            recognition.start();
-          } catch (e) {
-            // Already started or unsupported state
-          }
-        }
-      };
-
-      recognition.start();
-      recognitionRef.current = recognition;
-    } catch (e) {
-      console.error("Failed to start speech recognition:", e);
-    }
+    langRef.current = lang;
   }, [lang]);
 
-  const start = useCallback(async () => {
-    setTranscript("");
-    setAudioUrl(null);
+  useEffect(() => {
+    const hasMic =
+      typeof navigator !== "undefined" &&
+      !!navigator.mediaDevices &&
+      typeof navigator.mediaDevices.getUserMedia === "function" &&
+      typeof window !== "undefined" &&
+      typeof window.MediaRecorder !== "undefined";
+    setMicSupported(hasMic);
+    setSpeechSupported(!!(window.SpeechRecognition || window.webkitSpeechRecognition));
+  }, []);
 
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+  const releaseStream = useCallback(() => {
+    if (streamRef.current) {
+      try {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+      } catch {
+        /* track may already be ended */
+      }
+      streamRef.current = null;
+    }
+  }, []);
+
+  const stopRecognition = useCallback(() => {
+    const rec = recognitionRef.current;
+    if (rec) {
+      try {
+        rec.onend = null;
+        rec.onerror = null;
+        rec.stop();
+      } catch {
+        /* already stopped */
+      }
+      recognitionRef.current = null;
+    }
+  }, []);
+
+  // Turns the collected chunks into a playable blob URL and settles the state.
+  const finalize = useCallback(() => {
+    const mr = mediaRecorderRef.current;
+    const declared = (mr && mr.mimeType) || "";
+    const type = declared || (chunksRef.current[0] && chunksRef.current[0].type) || "audio/webm";
+    const blob = new Blob(chunksRef.current, { type });
+    chunksRef.current = [];
+    mediaRecorderRef.current = null;
+    activeRef.current = false;
+    startingRef.current = false;
+    stopRequestedRef.current = false;
+    releaseStream();
+
+    if (blob.size > 0 && !unmountedRef.current) {
+      if (urlRef.current) {
+        try {
+          URL.revokeObjectURL(urlRef.current);
+        } catch {
+          /* ignore */
+        }
+      }
+      const url = URL.createObjectURL(blob);
+      urlRef.current = url;
+      setAudioUrl(url);
+    }
+    if (!unmountedRef.current) setStatus("stopped");
+  }, [releaseStream]);
+
+  const start = useCallback(async () => {
+    // One session at a time: a second tap must never open a second stream.
+    if (startingRef.current || activeRef.current) return;
+    startingRef.current = true;
+    stopRequestedRef.current = false;
+    finalTextRef.current = "";
+    setTranscript("");
+
+    if (
+      typeof navigator === "undefined" ||
+      !navigator.mediaDevices ||
+      typeof navigator.mediaDevices.getUserMedia !== "function" ||
+      typeof window.MediaRecorder === "undefined"
+    ) {
+      startingRef.current = false;
       setStatus("denied");
       return;
     }
 
+    let stream = null;
     try {
-      isRecordingRef.current = true;
-
-      // 1. Start Audio Recording (for playback / session storage)
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        } 
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
       });
-      streamRef.current = stream;
-
-      const mimeType = getSupportedMimeType();
-      const options = mimeType ? { mimeType } : undefined;
-      const mr = new MediaRecorder(stream, options);
-
-      chunksRef.current = [];
-      mr.ondataavailable = (e) => {
-        if (e.data && e.data.size > 0) chunksRef.current.push(e.data);
-      };
-
-      mr.onstop = () => {
-        try {
-          const finalType = mr.mimeType || mimeType || "audio/mp4";
-          const blob = new Blob(chunksRef.current, { type: finalType });
-          if (blob.size > 0) {
-            const url = URL.createObjectURL(blob);
-            setAudioUrl(url);
-          }
-        } catch (e) {
-          console.error("Failed to process recorded audio Blob:", e);
-        } finally {
-          if (streamRef.current) {
-            streamRef.current.getTracks().forEach((t) => t.stop());
-            streamRef.current = null;
-          }
-          setStatus("stopped");
-        }
-      };
-
-      mr.start(1000);
-      mediaRecorderRef.current = mr;
-
-      // 2. Start Live Speech Recognition
-      startSpeechRecognition();
-
-      setStatus("recording");
-    } catch (err) {
-      console.error("Microphone access error:", err);
-      isRecordingRef.current = false;
-      setStatus("denied");
-    }
-  }, [startSpeechRecognition]);
-
-  const stop = useCallback(() => {
-    isRecordingRef.current = false;
-
-    // Stop MediaRecorder
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+    } catch {
+      // Some browsers reject the constraint object but accept the boolean form.
       try {
-        mediaRecorderRef.current.stop();
-      } catch (e) {
-        if (streamRef.current) {
-          streamRef.current.getTracks().forEach((t) => t.stop());
-          streamRef.current = null;
-        }
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch {
+        startingRef.current = false;
+        if (!unmountedRef.current) setStatus("denied");
+        return;
       }
     }
 
-    // Stop Speech Recognition
-    if (recognitionRef.current) {
+    if (unmountedRef.current) {
       try {
-        recognitionRef.current.onend = null; // Prevent auto-restart trigger on stop
-        recognitionRef.current.stop();
-      } catch (e) {
-        console.error("Failed to stop recognition:", e);
+        stream.getTracks().forEach((t) => t.stop());
+      } catch {
+        /* ignore */
       }
-      recognitionRef.current = null;
+      startingRef.current = false;
+      return;
     }
 
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-    }
-    setStatus("stopped");
-  }, []);
+    streamRef.current = stream;
 
-  const reset = useCallback(() => {
-    isRecordingRef.current = false;
-    if (audioUrl) URL.revokeObjectURL(audioUrl);
-    setAudioUrl(null);
-    setTranscript("");
-    setStatus("idle");
-  }, [audioUrl]);
-
-  useEffect(() => {
-    return () => {
-      isRecordingRef.current = false;
-      if (audioUrl) URL.revokeObjectURL(audioUrl);
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((t) => t.stop());
+    const mimeType = pickMimeType();
+    let mr = null;
+    try {
+      mr = mimeType ? new window.MediaRecorder(stream, { mimeType }) : new window.MediaRecorder(stream);
+    } catch {
+      try {
+        mr = new window.MediaRecorder(stream);
+      } catch {
+        releaseStream();
+        startingRef.current = false;
+        if (!unmountedRef.current) setStatus("denied");
+        return;
       }
-      if (recognitionRef.current) {
-        recognitionRef.current.onend = null;
-        recognitionRef.current.stop();
+    }
+
+    chunksRef.current = [];
+    mr.ondataavailable = (e) => {
+      if (e.data && e.data.size > 0) chunksRef.current.push(e.data);
+    };
+    mr.onerror = () => {
+      try {
+        mr.stop();
+      } catch {
+        finalize();
       }
     };
-  }, [audioUrl]);
+    mr.onstop = finalize;
+
+    mediaRecorderRef.current = mr;
+    activeRef.current = true;
+    startingRef.current = false;
+
+    try {
+      // Periodic chunks keep iOS Safari from dropping the tail of a long round.
+      mr.start(250);
+    } catch {
+      try {
+        mr.start();
+      } catch {
+        mediaRecorderRef.current = null;
+        activeRef.current = false;
+        releaseStream();
+        if (!unmountedRef.current) setStatus("denied");
+        return;
+      }
+    }
+
+    if (!unmountedRef.current) setStatus("recording");
+
+    // The user hit stop while the permission prompt was open.
+    if (stopRequestedRef.current) {
+      stopRequestedRef.current = false;
+      stopRecognition();
+      try {
+        mr.stop();
+      } catch {
+        finalize();
+      }
+      return;
+    }
+
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SR) {
+      try {
+        const rec = new SR();
+        rec.continuous = true;
+        rec.interimResults = true;
+        rec.lang = langRef.current === "fr" ? "fr-FR" : "en-US";
+        rec.onresult = (e) => {
+          let interim = "";
+          for (let i = e.resultIndex; i < e.results.length; i++) {
+            const text = e.results[i][0].transcript;
+            if (e.results[i].isFinal) finalTextRef.current += text + " ";
+            else interim += text;
+          }
+          setTranscript((finalTextRef.current + interim).trim());
+        };
+        rec.onerror = () => {};
+        rec.onend = () => {
+          // Restart only while the round is genuinely still recording.
+          if (activeRef.current && mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+            try {
+              rec.start();
+            } catch {
+              /* recognition restart is best-effort */
+            }
+          }
+        };
+        rec.start();
+        recognitionRef.current = rec;
+      } catch {
+        /* transcription is optional */
+      }
+    }
+  }, [finalize, releaseStream, stopRecognition]);
+
+  const stop = useCallback(() => {
+    stopRecognition();
+
+    // Permission still resolving: stop as soon as the stream is live.
+    if (startingRef.current) {
+      stopRequestedRef.current = true;
+      return;
+    }
+
+    const mr = mediaRecorderRef.current;
+    if (!mr) {
+      activeRef.current = false;
+      if (!unmountedRef.current) setStatus("stopped");
+      return;
+    }
+    // Already stopping — onstop will finalize exactly once.
+    if (mr.state === "inactive") return;
+
+    try {
+      if (mr.state === "recording" && typeof mr.requestData === "function") mr.requestData();
+    } catch {
+      /* Safari may not expose requestData */
+    }
+
+    try {
+      mr.stop();
+    } catch {
+      finalize();
+    }
+  }, [finalize, stopRecognition]);
+
+  const reset = useCallback(() => {
+    stopRecognition();
+
+    const mr = mediaRecorderRef.current;
+    if (mr) {
+      // Detach so a teardown stop cannot overwrite the fresh idle state.
+      mr.onstop = null;
+      mr.ondataavailable = null;
+      mr.onerror = null;
+      if (mr.state !== "inactive") {
+        try {
+          mr.stop();
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+    mediaRecorderRef.current = null;
+    chunksRef.current = [];
+    activeRef.current = false;
+    startingRef.current = false;
+    stopRequestedRef.current = false;
+    releaseStream();
+
+    if (urlRef.current) {
+      try {
+        URL.revokeObjectURL(urlRef.current);
+      } catch {
+        /* ignore */
+      }
+      urlRef.current = null;
+    }
+    setAudioUrl(null);
+    setTranscript("");
+    finalTextRef.current = "";
+    setStatus("idle");
+  }, [releaseStream, stopRecognition]);
+
+  // Unmount: kill the mic, the recorder and any object URL.
+  useEffect(() => {
+    unmountedRef.current = false;
+    return () => {
+      unmountedRef.current = true;
+      stopRecognition();
+      const mr = mediaRecorderRef.current;
+      if (mr) {
+        mr.onstop = null;
+        mr.ondataavailable = null;
+        if (mr.state !== "inactive") {
+          try {
+            mr.stop();
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+      mediaRecorderRef.current = null;
+      activeRef.current = false;
+      releaseStream();
+      // The object URL is intentionally kept alive: the review screen may still
+      // be playing it after the drill unmounts. It is revoked on the next start
+      // or on reset, and by the browser when the page unloads.
+      urlRef.current = null;
+    };
+  }, [releaseStream, stopRecognition]);
 
   return { status, audioUrl, transcript, micSupported, speechSupported, start, stop, reset };
 }
