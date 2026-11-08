@@ -5,8 +5,6 @@ import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import { LanguageProvider } from '@/lib/i18n';
-import { Analytics } from '@vercel/analytics/react';
-import { SpeedInsights } from '@vercel/speed-insights/react';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import ScrollToTop from './components/ScrollToTop';
 import Layout from '@/components/Layout';
@@ -20,11 +18,12 @@ import About from '@/pages/About';
 import Feedback from '@/pages/Feedback';
 import Contact from '@/pages/Contact';
 import SpeakingTips from '@/pages/SpeakingTips';
-import FloatingStreakBadge from '@/components/FloatingStreakBadge';
+// Add page imports here
 
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError } = useAuth();
+  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
 
+  // Show loading spinner while checking app public settings or auth
   if (isLoadingPublicSettings || isLoadingAuth) {
     return (
       <div className="fixed inset-0 flex items-center justify-center">
@@ -33,33 +32,40 @@ const AuthenticatedApp = () => {
     );
   }
 
-  if (authError && authError.type === 'user_not_registered') {
-    return <UserNotRegisteredError />;
+  // Handle authentication errors
+  if (authError) {
+    if (authError.type === 'user_not_registered') {
+      return <UserNotRegisteredError />;
+    } else if (authError.type === 'auth_required') {
+      // Redirect to login automatically
+      navigateToLogin();
+      return null;
+    }
   }
 
+  // Render the main app
   return (
-    <>
-      <FloatingStreakBadge />
-      <Routes>
-        <Route element={<Layout />}>
-          <Route path="/" element={<Landing />} />
-          <Route path="/train" element={<Drills />} />
-          <Route path="/drills/rebuttal-blitz" element={<RebuttalBlitz />} />
-          <Route path="/drills/think-fast" element={<ThinkFast />} />
-          <Route path="/soapbox" element={<Soapbox />} />
-          <Route path="/review" element={<Review />} />
-          <Route path="/about" element={<About />} />
-          <Route path="/feedback" element={<Feedback />} />
-          <Route path="/contact" element={<Contact />} />
-          <Route path="/tips" element={<SpeakingTips />} />
-        </Route>
-        <Route path="*" element={<PageNotFound />} />
-      </Routes>
-    </>
+    <Routes>
+      <Route element={<Layout />}>
+        <Route path="/" element={<Landing />} />
+        <Route path="/train" element={<Drills />} />
+        <Route path="/drills/rebuttal-blitz" element={<RebuttalBlitz />} />
+        <Route path="/drills/think-fast" element={<ThinkFast />} />
+        <Route path="/soapbox" element={<Soapbox />} />
+        <Route path="/review" element={<Review />} />
+        <Route path="/about" element={<About />} />
+        <Route path="/feedback" element={<Feedback />} />
+        <Route path="/contact" element={<Contact />} />
+        <Route path="/tips" element={<SpeakingTips />} />
+      </Route>
+      <Route path="*" element={<PageNotFound />} />
+    </Routes>
   );
 };
 
+
 function App() {
+
   return (
     <LanguageProvider>
       <AuthProvider>
@@ -71,10 +77,8 @@ function App() {
           <Toaster />
         </QueryClientProvider>
       </AuthProvider>
-      <Analytics />
-      <SpeedInsights />
     </LanguageProvider>
   )
 }
 
-export default App;
+export default App
