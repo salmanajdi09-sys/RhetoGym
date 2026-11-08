@@ -8,7 +8,7 @@ import ReviewPanel from "@/components/ReviewPanel";
 import WarmUpBox from "@/components/WarmUpBox";
 import PracticeReceipt from "@/components/PracticeReceipt";
 import TopicSelect from "@/components/TopicSelect";
-import { completeRoundAndTriggerCounter } from "@/lib/streakStore";
+import DurationSelect from "@/components/DurationSelect";
 import LevelBadge from "@/components/LevelBadge";
 import { useRecorder } from "@/hooks/useRecorder";
 import { soapboxPrompts, randomPrompt, promptText } from "@/data/prompts";
@@ -16,23 +16,31 @@ import { computeMetrics, paceBand, formatTime } from "@/lib/speech";
 import { saveSession } from "@/lib/sessionStore";
 import { useLanguage, useT } from "@/lib/i18n";
 
-const TOTAL = 75;
+const DEFAULT_DURATION = 75;
+const RECOMMENDED_DURATION = 90;
 const ACCENT = "lavender";
 
 export default function Soapbox() {
   const navigate = useNavigate();
   const t = useT();
   const { lang } = useLanguage();
-  const [phase, setPhase] = useState("topic"); // topic | prompt | warmup | record | receipt | review
+  const [phase, setPhase] = useState("topic"); // topic | prompt | warmup | record | review
   const [category, setCategory] = useState("surprise");
   const [level, setLevel] = useState("any");
   const [prompt, setPrompt] = useState(null);
   const [elapsed, setElapsed] = useState(0);
   const [metrics, setMetrics] = useState(null);
   const [round, setRound] = useState(null);
+  const [duration, setDuration] = useState(null);
+  const [showReceipt, setShowReceipt] = useState(false);
   const timerRef = useRef(null);
+  const elapsedRef = useRef(0);
+  const handledRef = useRef(false);
 
   const rec = useRecorder(lang);
+
+  // Only the speaking length is chosen per round.
+  const TOTAL = duration || DEFAULT_DURATION;
 
   const selectTopic = (cat, lvl) => {
     setCategory(cat);
@@ -43,17 +51,20 @@ export default function Soapbox() {
   const shuffle = () => setPrompt(randomPrompt(soapboxPrompts, lang, category, level));
 
   useEffect(() => {
-    if (phase !== "record") return;
+    if (phase !== "record" || rec.status !== "recording") return;
     const start = Date.now();
     timerRef.current = setInterval(() => {
-      const e = Math.floor((Date.now() - start) / 1000);
+      const e = (Date.now() - start) / 1000;
+      elapsedRef.current = e;
       setElapsed(e);
       if (e >= TOTAL) finish();
-    }, 1000);
+    }, 100);
     return () => clearInterval(timerRef.current);
-  }, [phase]);
+  }, [phase, rec.status]);
 
   const start = async () => {
+    elapsedRef.current = 0;
+    handledRef.current = false;
     setElapsed(0);
     setMetrics(null);
     await rec.start();
@@ -62,45 +73,47 @@ export default function Soapbox() {
 
   const finish = () => {
     if (timerRef.current) clearInterval(timerRef.current);
-    completeRoundAndTriggerCounter({ lang });
     rec.stop();
   };
 
   useEffect(() => {
-    if (rec.status === "stopped" && phase === "record") {
-      const timer = setTimeout(() => {
-        const dur = Math.min(TOTAL, Math.max(elapsed, 1));
-        const mt = computeMetrics(rec.transcript, dur);
-        setMetrics(mt);
-        const txt = promptText(prompt, lang);
-        setRound(saveSession({
-          audioUrl: rec.audioUrl,
-          transcript: rec.transcript,
-          metrics: mt,
-          accent: ACCENT,
-          motion: txt,
-          position: "DELIVER",
-          drillName: "Soapbox",
-          durationSec: dur,
-          category: prompt?.cats?.[0] || "general", 
-          difficulty: prompt?.level || "any", 
-          promptId: prompt?.id || "prompt", 
-          challengeType: prompt?.structure || prompt?.type || "soapbox", 
-          targetDuration: TOTAL,
-        }));
-        setPhase("receipt");
-      }, 200);
-
-      return () => clearTimeout(timer);
+    if (rec.status === "stopped" && phase === "record" && !handledRef.current) {
+      handledRef.current = true;
+      const dur = Math.min(TOTAL, Math.max(elapsedRef.current || elapsed, 1));
+      const mt = computeMetrics(rec.transcript, dur);
+      setMetrics(mt);
+      const txt = promptText(prompt, lang);
+      setRound(saveSession({
+        audioUrl: rec.audioUrl,
+        transcript: rec.transcript,
+        metrics: mt,
+        accent: ACCENT,
+        motion: txt,
+        position: "DELIVER",
+        drillName: "Soapbox",
+        durationSec: dur,
+        category: prompt.cats[0], difficulty: prompt.level, promptId: prompt.id, challengeType: prompt.structure || prompt.type, targetDuration: TOTAL,
+      }));
+      setShowReceipt(true);
+      setPhase("review");
     }
   }, [rec.status]);
+
+  const dismissReceipt = () => {
+    setShowReceipt(false);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   const retry = () => {
     rec.reset();
     shuffle();
+    elapsedRef.current = 0;
+    handledRef.current = false;
     setElapsed(0);
     setMetrics(null);
     setRound(null);
+    setDuration(null);
+    setShowReceipt(false);
     setPhase("prompt");
   };
 
@@ -148,8 +161,12 @@ export default function Soapbox() {
             <p className="font-display text-2xl sm:text-3xl text-charcoal mt-2 text-balance">{txt}</p>
           </div>
 
+          <div className="mt-6 rounded-3xl border border-border/60 bg-card/70 p-5 sm:p-6">
+            <DurationSelect value={duration} onChange={setDuration} accent={ACCENT} recommended={RECOMMENDED_DURATION} />
+          </div>
+
           <div className="mt-8 flex flex-col sm:flex-row gap-3 items-center justify-center">
-            <button onClick={() => setPhase("warmup")} className="group inline-flex items-center gap-2 px-8 py-4 rounded-full bg-charcoal text-cream font-semibold text-lg hover:scale-[1.03] transition-transform">
+            <button onClick={() => setPhase("warmup")} disabled={!duration} className="group inline-flex items-center gap-2 px-8 py-4 rounded-full bg-charcoal text-cream font-semibold text-lg hover:scale-[1.03] transition-transform disabled:opacity-40 disabled:hover:scale-100 disabled:cursor-not-allowed">
               {t("common.ready")} <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </button>
             <button onClick={shuffle} className="inline-flex items-center gap-2 px-5 py-3 rounded-full text-charcoal/60 hover:text-charcoal text-sm">
@@ -163,88 +180,80 @@ export default function Soapbox() {
 
   if (phase === "warmup") {
     return (
-      <WarmUpBox
-        accent={ACCENT}
-        onBack={() => setPhase("prompt")}
-        onStart={start}
-      />
+      <div className="relative min-h-[70vh] flex flex-col items-center justify-center">
+        <FloatingShapes density="light" />
+        <div className="relative mx-auto max-w-2xl px-5 sm:px-8 py-10 w-full">
+          <WarmUpBox onContinue={start} accent={ACCENT} />
+        </div>
+      </div>
     );
   }
 
   if (phase === "record") {
+    if (rec.status === "denied") {
+      return (
+        <div className="relative mx-auto max-w-lg px-5 sm:px-8 py-16 text-center">
+          <AlertCircle className="w-10 h-10 text-coral-deep mx-auto mb-4" />
+          <h2 className="font-display text-3xl text-charcoal">{t("record.micDenied")}</h2>
+          <p className="text-charcoal/60 mt-3">{t("record.micDeniedBody")}</p>
+          <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
+            <button onClick={async () => { await rec.start(); }} className="px-6 py-3 rounded-full bg-charcoal text-cream font-medium">{t("record.tryAgain")}</button>
+            <button onClick={() => { setMetrics(computeMetrics("", TOTAL)); setPhase("review"); }} className="px-6 py-3 rounded-full bg-card border border-border font-medium">{t("record.continuePractice")}</button>
+          </div>
+        </div>
+      );
+    }
+    const remaining = Math.max(0, TOTAL - elapsed);
+    const pct = Math.min(elapsed / TOTAL, 1);
     return (
-      <div className="relative min-h-[85vh] flex flex-col px-5 sm:px-8 py-8 max-w-4xl mx-auto justify-between">
+      <div className="relative min-h-[80vh] flex flex-col">
         <FloatingShapes density="light" />
-        <div>
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-coral animate-pulse" />
-              <span className="font-mono text-xs uppercase tracking-widest text-coral font-medium">
-                {t("record.recording")}
+        <div className="relative mx-auto max-w-2xl px-5 sm:px-8 py-8 w-full flex-1 flex flex-col">
+          <div className="text-center">
+            <span className="font-mono text-xs uppercase tracking-widest text-lavender-deep">{t("drills.soapbox.name")}</span>
+            <p className="mt-2 text-charcoal/70 text-balance">{txt}</p>
+          </div>
+
+          <div className="mt-6"><AudienceViz energy={energy} restless={restless} /></div>
+
+          <div className="flex-1 flex flex-col items-center justify-center py-6">
+            <div className="font-display text-[4.5rem] sm:text-[6rem] font-semibold leading-none tabular-nums text-charcoal">{formatTime(remaining)}</div>
+            <div className="mt-3 inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-charcoal/5">
+              <span className={`w-2.5 h-2.5 rounded-full ${bandColor} ${rec.status === "recording" ? "animate-pulse-soft" : ""}`} />
+              <span className="font-mono text-xs uppercase tracking-widest text-charcoal/60">{liveWpm > 0 ? `~${liveWpm} WPM` : "…"}</span>
+            </div>
+          </div>
+
+          <div className="h-2.5 rounded-full bg-charcoal/8 overflow-hidden">
+            <motion.div className="h-full rounded-full" style={{ width: `${pct * 100}%`, background: `hsl(var(--${ACCENT}-deep))` }} />
+          </div>
+
+          <div className="mt-6 flex flex-col items-center gap-4">
+            <div className="inline-flex items-center gap-3 px-6 py-3 rounded-full bg-coral/20 border border-coral-deep/30">
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-coral-deep opacity-60" />
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-coral-deep" />
               </span>
+              <span className="font-mono text-sm font-bold tracking-widest text-coral-deep">{t("record.recording")}</span>
             </div>
-            <div className="font-mono text-sm text-charcoal/60">
-              {formatTime(elapsed)} / {formatTime(TOTAL)}
-            </div>
-          </div>
-          <div className="mt-8 rounded-3xl border border-border/60 bg-card/70 p-6 sm:p-8">
-            <span className="font-mono text-xs uppercase tracking-widest text-charcoal/40">{t("common.yourMotion")}</span>
-            <h2 className="font-display text-2xl sm:text-3xl text-charcoal mt-1 text-balance">{txt}</h2>
-          </div>
-        </div>
-
-        <div className="my-8 rounded-3xl border border-border/60 bg-card/60 p-6 sm:p-8 min-h-[160px] max-h-[220px] overflow-y-auto">
-          <span className="font-mono text-xs uppercase tracking-widest text-charcoal/40 block mb-2">{t("record.transcriptLive")}</span>
-          <p className="text-charcoal/80 text-lg leading-relaxed font-sans">
-            {rec.transcript || <span className="text-charcoal/30 italic">{t("record.startSpeaking")}</span>}
-          </p>
-        </div>
-
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div className="flex items-center gap-3">
-            <div className={`px-3 py-1.5 rounded-full text-xs font-mono font-medium text-charcoal flex items-center gap-1.5 ${bandColor}`}>
-              <span className="w-2 h-2 rounded-full bg-charcoal/60" />
-              {liveWpm} WPM
+            <div className="flex flex-col sm:flex-row items-center gap-3">
+              <button onClick={finish} className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-charcoal text-cream font-medium hover:scale-105 transition-transform">
+                <Square className="w-4 h-4" /> {t("record.endReview")}
+              </button>
+              <button onClick={retry} className="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-card border border-border text-charcoal/70 font-medium hover:text-charcoal">
+                <RotateCcw className="w-4 h-4" /> {t("record.restart")}
+              </button>
             </div>
           </div>
-          <button
-            onClick={finish}
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-charcoal text-white text-sm font-medium hover:bg-charcoal/90 transition-all shadow-lg"
-          >
-            <Square className="w-4 h-4 fill-current" /> {t("record.finish")}
-          </button>
         </div>
       </div>
     );
   }
 
-  if (phase === "receipt") {
-    return (
-      <div className="relative min-h-[85vh] px-5 sm:px-8 py-10 max-w-2xl mx-auto flex flex-col items-center justify-center">
-        <FloatingShapes density="light" />
-        <PracticeReceipt
-          round={round}
-          metrics={metrics}
-          accent={ACCENT}
-          onViewReview={() => setPhase("review")}
-        />
-      </div>
-    );
-  }
-
-  if (phase === "review") {
-    return (
-      <div className="relative min-h-[85vh] px-5 sm:px-8 py-10 max-w-4xl mx-auto">
-        <FloatingShapes density="light" />
-        <ReviewPanel
-          round={round}
-          metrics={metrics}
-          accent={ACCENT}
-          onRetry={retry}
-        />
-      </div>
-    );
-  }
-
-  return null;
+  return (
+    <div className="relative mx-auto max-w-3xl px-5 sm:px-8 py-10">
+      <ReviewPanel key={round?.id || prompt?.id} record={round || { category: prompt?.cats[0], difficulty: prompt?.level, promptId: prompt?.id, challengeType: prompt?.structure, targetDuration: TOTAL }} audioUrl={rec.audioUrl} transcript={rec.transcript} metrics={metrics} accent={ACCENT} motion={txt} position="DELIVER" drillName="Soapbox" onRetry={retry} extra={<AudienceViz energy={metrics?.hasTranscript ? 0.7 : 0.4} restless={0} />} />
+      {showReceipt && round && <PracticeReceipt round={round} onClose={dismissReceipt} onContinue={dismissReceipt} />}
+    </div>
+  );
 }
