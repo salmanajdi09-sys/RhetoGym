@@ -23,31 +23,32 @@ Prepared presentations and real-time, impromptu communication require fundamenta
 
 ## ✨ Key Features
 
-* 💡 **Dynamic Prompt Engine:** Instant generator for impromptu speaking, debate topics, and storytelling exercises in both **English and French**.
-* ⏱️ **Custom Countdown Timers:** Dedicated preparation and speaking countdowns designed to simulate real-world time pressure.
-* 📊 **Self-Reflection & Analytics:** Review transcripts, analyze pace, catch filler words, add timestamped notes, and monitor confidence trends over time in your **Round History**.
-* 🔒 **100% Free & Zero Friction:** No account creation, passwords, or paywalls required.
+- 💡 **Dynamic Prompt Engine:** Instant generator for impromptu speaking, debate topics, and storytelling exercises in both **English and French**.
+- ⏱️ **Custom Countdown Timers:** Dedicated preparation and speaking countdowns (40s, 1m, 1.5m, 2m, and 3m) designed to simulate real-world time pressure.
+- 📊 **Self-Reflection & Analytics:** Review transcripts, analyze pace, catch filler words, add timestamped notes, and monitor confidence trends over time in your **Round History**.
+- 📅 **Habit-Building Reminders:** One-click Google Calendar reminder links to schedule your next speaking session while motivation is high.
+- 🔒 **100% Free & Zero Friction:** No account creation, passwords, or paywalls required.
 
 ---
 
 ## 🛠️ Tech Stack
 
-* **Framework:** Vite / React
-* **Styling:** Tailwind CSS
-* **Deployment:** Vercel
+- **Framework:** Vite / React
+- **Styling:** Tailwind CSS
+- **Deployment:** Vercel
 
 ---
 
 ## 🤖 AI Integration & Development Disclosure
 
-*(Submitted in alignment with the Global AI Builder’s Challenge judging criteria)*
-
 ### 1. AI in the Finished Product
-* **Prompt Curation & Categorization:** Utilizing lightweight AI model workflows to generate, filter, and balance diverse, high-quality debate and impromptu prompts across multiple difficulty tiers and languages (English & French).
+- **Prompt Curation & Categorization:** Utilizing lightweight AI workflows (powered by Google Gemini) to generate, filter, and balance diverse debate and impromptu speaking prompts across multiple difficulty tiers and languages (English & French).
+- **Post-Session Feedback & Analysis:** Leveraging AI-assisted analysis to help speakers evaluate pacing, detect filler words, and structure self-reflection notes.
 
-### 2. AI During Development (Vibe Coding & Iteration)
-* **UI Scaffolding & Prototyping:** AI coding assistants (ChatGPT / Cursor) were leveraged for rapid UI layout exploration, dynamic timer hook setups, and component architecture.
-* **Human Verification Process:** 100% of AI-generated code snippets and prompt structures were manually reviewed, debugged, refined, and verified to ensure responsive UI performance, accessibility, and clean deployment on Vercel.
+### 2. AI During Development
+- **App Scaffolding & Prototyping (Base44):** Base44 was used to rapidly prototype and structure the initial full-stack web application layout, core UI components, and interactive flows.
+- **Code Refinement & Iteration (Google Gemini):** Google Gemini was used alongside Base44 to debug logic, refine custom timer hooks, iterate on user feedback, and polish documentation.
+- **Human Verification Process:** All AI-generated architecture, prompts, and code were manually tested, refined, and verified with real student speakers to ensure responsive UI performance, accessibility, and clean deployment on Vercel.
 
 ---
 
